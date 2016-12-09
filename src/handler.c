@@ -1,18 +1,18 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                     Main structure manipulation module                   *
+ *		        Main structure manipulation module		    *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -24,6 +24,8 @@ extern int top_ed;
 extern int top_affect;
 extern int cur_qobjs;
 extern int cur_qchars;
+extern CHAR_DATA *gch_prev;
+extern OBJ_DATA *gobj_prev;
 extern REL_DATA *first_relation;
 extern REL_DATA *last_relation;
 
@@ -38,573 +40,8 @@ bool cur_obj_extracted;
 obj_ret global_objcode;
 
 OBJ_DATA *group_object( OBJ_DATA * obj1, OBJ_DATA * obj2 );
-void update_room_reset( CHAR_DATA *ch, bool setting );
 bool in_magic_container( OBJ_DATA * obj );
 void delete_reset( RESET_DATA * pReset );
-
-/* 50 nested loops should be enough till the end of time,
-   unless someone forgot to deallocate :P - Luc 06/2007 */
-#define TRW_MAXHEAP 50
-
-int trw_loops = 0;
-TRV_WORLD trw_heap[TRW_MAXHEAP];
-
-TRV_DATA *trvch_create( CHAR_DATA * ch, trv_type tp )
-{
-   CHAR_DATA *first, *ptr;
-   TRV_DATA *New;
-   int count = 0;
-
-   if( tp == TR_CHAR_ROOM_FORW || tp == TR_CHAR_ROOM_BACK )
-   {
-      if( !ch )
-      {
-         bug( "%s: NULL ch.", __func__ );
-         return NULL;
-      }
-      else if( !ch->in_room )
-      {
-         bug( "%s: type %d with NULL room.", __func__, tp );
-         return NULL;
-      }
-   }
-
-   switch ( tp )
-   {
-      case TR_CHAR_ROOM_FORW:
-         first = ptr = ch->in_room->first_person;
-         while( ptr )
-         {
-            ptr = ptr->next_in_room;
-            count++;
-         }
-         break;
-
-      case TR_CHAR_ROOM_BACK:
-         first = ptr = ch->in_room->last_person;
-         while( ptr )
-         {
-            ptr = ptr->prev_in_room;
-            count++;
-         }
-         break;
-
-/*    case TR_CHAR_WORLD_FORW:
-         first = ptr = first_char;
-         while ( ptr ) {
-            ptr = ptr->next;
-            count++;
-            }
-         break;
-
-      case TR_CHAR_WORLD_BACK:
-         first = ptr = last_char;
-         while ( ptr ) {
-            ptr = ptr->prev;
-            count++;
-            }
-         break; */
-
-      default:
-         bug( "%s: bad type (%d).", __func__, tp );
-         return NULL;
-   }
-
-   New = ( TRV_DATA * ) malloc( sizeof( TRV_DATA ) );
-   if( !New )
-   {
-      bug( "%s: malloc() failure for %d nodes.", __func__, count );
-      return NULL;
-   }
-
-   New->el = (void**) malloc( count * sizeof(void*) );
-   if( !New->el )
-   {
-      bug( "%s: malloc() failure for %d nodes.", __func__, count );
-      return NULL;
-   }
-
-   New->type = tp;
-   New->count = count;
-   New->current = 1;
-   New->ext_mark = extracted_char_queue;
-   count = 0;
-   ptr = first;
-
-   switch ( tp )
-   {
-      case TR_CHAR_ROOM_FORW:
-         for( ; ptr; ptr = ptr->next_in_room )
-            New->el[count++] = ptr;
-         New->where = first->in_room;
-         break;
-      case TR_CHAR_ROOM_BACK:
-         for( ; ptr; ptr = ptr->prev_in_room )
-            New->el[count++] = ptr;
-         New->where = first->in_room;
-         break;
-      case TR_CHAR_WORLD_FORW:
-         for( ; ptr; ptr = ptr->next )
-            New->el[count++] = ptr;
-         New->where = NULL;
-         break;
-      case TR_CHAR_WORLD_BACK:
-         for( ; ptr; ptr = ptr->prev )
-            New->el[count++] = ptr;
-         New->where = NULL;
-         break;
-      default:
-         break;
-   }
-   return New;
-}
-
-TRV_DATA *trvobj_create( OBJ_DATA * obj, trv_type tp )
-{
-   OBJ_DATA *first, *ptr;
-   void *ground_zero;
-   TRV_DATA *New;
-   int count = 0;
-
-   if( !obj && tp >= TR_OBJ_ROOM_FORW && tp <= TR_OBJ_OBJ_BACK )
-   {
-      bug( "%s: NULL obj.", __func__ );
-      return NULL;
-   }
-
-   if( ( tp == TR_OBJ_ROOM_FORW || tp == TR_OBJ_ROOM_BACK ) && !obj->in_room )
-   {
-      bug( "%s: type %d in NULL room.", __func__, tp );
-      return NULL;
-   }
-
-   if( ( tp == TR_OBJ_CHAR_FORW || tp == TR_OBJ_CHAR_BACK ) && !obj->carried_by )
-   {
-      bug( "%s: type %d in NULL carrier.", __func__, tp );
-      return NULL;
-   }
-
-   if( ( tp == TR_OBJ_OBJ_FORW || tp == TR_OBJ_OBJ_BACK ) && !obj->in_obj )
-   {
-      bug( "%s: type %d in NULL container.", __func__, tp );
-      return NULL;
-   }
-
-   switch ( tp )
-   {
-      case TR_OBJ_ROOM_FORW:
-         ground_zero = obj->in_room;
-         first = ptr = obj->in_room->first_content;
-         while( ptr )
-         {
-            ptr = ptr->next_content;
-            count++;
-         }
-         break;
-
-      case TR_OBJ_ROOM_BACK:
-         ground_zero = obj->in_room;
-         first = ptr = obj->in_room->last_content;
-         while( ptr )
-         {
-            ptr = ptr->prev_content;
-            count++;
-         }
-         break;
-
-      case TR_OBJ_CHAR_FORW:
-         ground_zero = obj->carried_by;
-         first = ptr = obj->carried_by->first_carrying;
-         while( ptr )
-         {
-            ptr = ptr->next_content;
-            count++;
-         }
-         break;
-
-      case TR_OBJ_CHAR_BACK:
-         ground_zero = obj->carried_by;
-         first = ptr = obj->carried_by->last_carrying;
-         while( ptr )
-         {
-            ptr = ptr->prev_content;
-            count++;
-         }
-         break;
-
-      case TR_OBJ_OBJ_FORW:
-         ground_zero = obj->in_obj;
-         first = ptr = obj->in_obj->first_content;
-         while( ptr )
-         {
-            ptr = ptr->next_content;
-            count++;
-         }
-         break;
-
-      case TR_OBJ_OBJ_BACK:
-         ground_zero = obj->in_obj;
-         first = ptr = obj->in_obj->last_content;
-         while( ptr )
-         {
-            ptr = ptr->prev_content;
-            count++;
-         }
-         break;
-
-         /*
-          * Hmmm.  Trouble is, on big muds there may be LOTS of objects,
-          * meaning lots memory (about 800k for a 200k objs mud) and lots
-          * of iterations.  Maybe these two should be redone with a different
-          * algorithm, considering that the world lists operate on simpler
-          * conditions: elements are only extracted for good or appended at
-          * the end, not moved back and forth between lists at this level 
-          */
-/*    case TR_OBJ_WORLD_FORW:
-         ground_zero = NULL;
-         first = ptr = first_object;
-         while ( ptr ) {
-            ptr = ptr->next;
-            count++;
-            }
-         break;
-
-      case TR_OBJ_WORLD_BACK:
-         ground_zero = NULL;
-         first = ptr = last_object;
-         while ( ptr ) {
-            ptr = ptr->prev;
-            count++;
-            }
-         break; */
-      default:
-         bug( "%s: bad type (%d).", __func__, tp );
-         return NULL;
-   }
-
-   New = ( TRV_DATA * ) malloc( sizeof( TRV_DATA ) );
-   if( !New )
-   {
-      bug( "%s: malloc() failure, %d nodes, type %d.", __func__, count, tp );
-      return NULL;
-   }
-
-   New->el = (void**) malloc(count * sizeof(void*) );
-   if( !New->el )
-   {
-      bug( "%s: malloc() failure, %d nodes, type %d.", __func__, count, tp );
-      return NULL;
-   }
-
-   New->type = tp;
-   New->count = count;
-   New->current = 1;
-   New->ext_mark = extracted_obj_queue;
-   New->where = ground_zero;
-   count = 0;
-   ptr = first;
-
-   switch ( tp )
-   {
-      case TR_OBJ_ROOM_FORW:
-      case TR_OBJ_CHAR_FORW:
-      case TR_OBJ_OBJ_FORW:
-         for( ; ptr; ptr = ptr->next_content )
-            New->el[count++] = ptr;
-         break;
-
-      case TR_OBJ_ROOM_BACK:
-      case TR_OBJ_CHAR_BACK:
-      case TR_OBJ_OBJ_BACK:
-         for( ; ptr; ptr = ptr->prev_content )
-            New->el[count++] = ptr;
-         break;
-
-      case TR_OBJ_WORLD_FORW:
-         for( ; ptr; ptr = ptr->next )
-            New->el[count++] = ptr;
-         break;
-
-      case TR_OBJ_WORLD_BACK:
-         for( ; ptr; ptr = ptr->prev )
-            New->el[count++] = ptr;
-         break;
-
-      default:
-         break;
-   }
-   return New;
-}
-
-void trv_dispose( TRV_DATA ** p )
-{
-   if( *p )
-   {
-      free( (*p)->el );
-      free( *p );
-      *p = NULL;
-   }
-   else
-      bug( "%s: NULL pointer.", __func__ );
-}
-
-CHAR_DATA *trvch_next( TRV_DATA * lc )
-{
-   EXTRACT_CHAR_DATA *extr;
-   CHAR_DATA *nx;
-
-   if( !lc )
-      return NULL;
-
-   if( lc->type < TR_CHAR_WORLD_FORW || lc->type > TR_CHAR_ROOM_BACK )
-   {
-      bug( "%s: called on a type %d structure.", __func__, lc->type );
-      return NULL;
-   }
-
-   while( lc->current < lc->count )
-   {
-      nx = ( CHAR_DATA * ) lc->el[lc->current++];
-
-      /*
-       * Check for list membership. Doesn't apply to world loops. 
-       */
-      if( lc->where && nx->in_room && nx->in_room != lc->where )
-         continue;
-
-      /*
-       * Check for extracted chars.  Either an NPC or a quitting PC... 
-       */
-      if( !nx->in_room )
-         continue;
-
-      /*
-       * It may still be a "revived" PC... 
-       */
-      for( extr = extracted_char_queue; extr != lc->ext_mark; extr = extr->next )
-         if( extr->ch == nx )
-            break;
-      if( extr != lc->ext_mark )
-         continue;
-
-      return nx;
-   }
-
-   /*
-    * No more chars in the list, endgame 
-    */
-   return NULL;
-}
-
-OBJ_DATA *trvobj_next( TRV_DATA * lc )
-{
-   OBJ_DATA *extr;
-   void *where;
-   OBJ_DATA *nx;
-
-   if( !lc )
-      return NULL;
-
-   if( lc->type < TR_OBJ_WORLD_FORW || lc->type > TR_OBJ_OBJ_BACK )
-   {
-      bug( "%s: called on a type %d structure.", __func__, lc->type );
-      return NULL;
-   }
-
-   while( lc->current < lc->count )
-   {
-      nx = ( OBJ_DATA * ) lc->el[lc->current++];
-
-      /*
-       * Check for list membership 
-       */
-      if( nx->in_room )
-         where = nx->in_room;
-      else if( nx->carried_by )
-         where = nx->carried_by;
-      else
-         where = nx->in_obj;
-      if( lc->where && where && where != lc->where )
-         continue;
-
-      /*
-       * Skip extracted and auctioned objs 
-       */
-      if( !where )
-         continue;
-
-      /*
-       * Do we need this if it's ok to skip auctions? 
-       */
-      for( extr = extracted_obj_queue; extr != lc->ext_mark; extr = extr->next )
-         if( extr == nx )
-            break;
-      if( extr != lc->ext_mark )
-         continue;
-
-      return nx;
-   }
-   return NULL;
-}
-
-TRV_WORLD *trworld_create( trv_type tp )
-{
-   TRV_WORLD *tnew;
-
-   if( tp != TR_CHAR_WORLD_FORW && tp != TR_CHAR_WORLD_BACK && tp != TR_OBJ_WORLD_FORW && tp != TR_OBJ_WORLD_BACK )
-   {
-      bug( "%s: invalid type %d.", __func__, tp );
-      return NULL;
-   }
-
-   if( trw_loops >= TRW_MAXHEAP )
-   {
-      bug( "%s: heap limit exceeded.", __func__ );
-      return NULL;
-   }
-
-   tnew = trw_heap + trw_loops++;
-   tnew->type = tp;
-   if( tp == TR_CHAR_WORLD_FORW )
-   {
-      tnew->limit = last_char;
-      tnew->next = first_char->next;
-   }
-   else if( tp == TR_CHAR_WORLD_BACK )
-   {
-      tnew->limit = first_char;
-      tnew->next = last_char->prev;
-   }
-   else if( tp == TR_OBJ_WORLD_FORW )
-   {
-      tnew->limit = last_object;
-      tnew->next = first_object->next;
-   }
-   else
-   {  /* TR_OBJ_WORLD_BACK */
-      tnew->limit = first_object;
-      tnew->next = last_object->prev;
-   }
-   return tnew;
-}
-
-void trworld_dispose( TRV_WORLD ** trash )
-{
-
-   if( ( trw_heap + --trw_loops ) != *trash )
-   {
-      bug( "%s: midlist control block (%zd).", __func__, *trash - trw_heap );
-      ++trw_loops;
-   }
-   else
-      *trash = NULL;
-}
-
-CHAR_DATA *trvch_wnext( TRV_WORLD * lc )
-{
-   CHAR_DATA *nx;
-
-   if( lc->type != TR_CHAR_WORLD_FORW && lc->type != TR_CHAR_WORLD_BACK )
-   {
-      bug( "%s: invalid type (%d).", __func__, lc->type );
-      return NULL;
-   }
-
-   nx = ( CHAR_DATA * ) lc->next;
-   if( !nx )
-      return NULL;
-
-   if( nx == lc->limit )
-      lc->next = NULL;
-   else
-      lc->next = lc->type == TR_CHAR_WORLD_FORW ? nx->next : nx->prev;
-   return nx;
-}
-
-OBJ_DATA *trvobj_wnext( TRV_WORLD * lc )
-{
-   OBJ_DATA *nx;
-
-   if( lc->type != TR_OBJ_WORLD_FORW && lc->type != TR_OBJ_WORLD_BACK )
-   {
-      bug( "%s: invalid type (%d).", __func__, lc->type );
-      return NULL;
-   }
-
-   nx = ( OBJ_DATA * ) lc->next;
-   if( !nx )
-      return NULL;
-
-   if( nx == lc->limit )
-      lc->next = NULL;
-   else
-      lc->next = lc->type == TR_OBJ_WORLD_FORW ? nx->next : nx->prev;
-   return nx;
-}
-
-/* For node removal. Add wherever you remove nodes from the world lists,
-   like in extract_char() and extract_obj()  */
-void trworld_char_check( CHAR_DATA * rmv )
-{
-   TRV_WORLD *sp;
-
-   if( !rmv )
-      return;
-
-   for( sp = trw_heap + trw_loops - 1; sp >= trw_heap; --sp )
-   {
-
-      if( sp->type < TR_CHAR_WORLD_FORW || sp->type > TR_CHAR_WORLD_BACK )
-         continue;
-      if( sp->limit == rmv )
-         sp->limit = sp->type == TR_CHAR_WORLD_FORW ? rmv->prev : rmv->next;
-      if( sp->next == rmv )
-         sp->next = sp->type == TR_CHAR_WORLD_FORW ?
-            ( ( CHAR_DATA * ) ( sp->next ) )->next : ( ( CHAR_DATA * ) ( sp->next ) )->prev;
-   }
-}
-
-void trworld_obj_check( OBJ_DATA * rmv )
-{
-   TRV_WORLD *sp;
-
-   if( !rmv )
-      return;
-
-   for( sp = trw_heap + trw_loops - 1; sp >= trw_heap; --sp )
-   {
-      if( sp->type < TR_OBJ_WORLD_FORW || sp->type > TR_OBJ_WORLD_BACK )
-         continue;
-      if( sp->limit == rmv )
-         sp->limit = sp->type == TR_OBJ_WORLD_FORW ? rmv->prev : rmv->next;
-      if( sp->next == rmv )
-         sp->next = sp->type == TR_OBJ_WORLD_FORW ?
-            ( ( CHAR_DATA * ) ( sp->next ) )->next : ( ( CHAR_DATA * ) ( sp->next ) )->prev;
-   }
-}
-
-int umin( int check, int ncheck )
-{
-   if( check < ncheck )
-      return check;
-   return ncheck;
-}
-
-int umax( int check, int ncheck )
-{
-   if( check > ncheck )
-      return check;
-   return ncheck;
-}
-
-int urange( int mincheck, int check, int maxcheck )
-{
-   if( check < mincheck )
-      return mincheck;
-   if( check > maxcheck )
-      return maxcheck;
-   return check;
-}
 
 /*
  * Return how much exp a char has
@@ -697,30 +134,18 @@ short get_trust( CHAR_DATA * ch )
    if( IS_NPC( ch ) && ch->level >= LEVEL_AVATAR )
       return LEVEL_AVATAR;
 
+   if( ch->level >= LEVEL_NEOPHYTE && IS_RETIRED( ch ) )
+      return LEVEL_NEOPHYTE;
+
    return ch->level;
 }
 
-/* One hopes this will do as planned and determine how old a PC is based on the birthdate
-   we record at creation. - Samson 10-25-99 */
-short calculate_age( CHAR_DATA * ch )
+/*
+ * Retrieve a character's age.
+ */
+short get_age( CHAR_DATA * ch )
 {
-   short age, num_days, ch_days;
-
-   if( IS_NPC( ch ) )
-      return -1;
-
-   num_days = ( time_info.month + 1 ) * sysdata.dayspermonth;
-   num_days += time_info.day;
-
-   ch_days = ( ch->pcdata->month + 1 ) * sysdata.dayspermonth;
-   ch_days += ch->pcdata->day;
-
-   age = time_info.year - ch->pcdata->year;
-
-   if( ch_days - num_days > 0 )
-      age -= 1;
-
-   return age;
+   return 17 + ( ch->played + ( current_time - ch->logon ) ) / 7200;
 }
 
 /*
@@ -913,7 +338,7 @@ bool can_take_proto( CHAR_DATA * ch )
 /*
  * See if a string is one of the names of an object.
  */
-bool is_name( const char *str, const char *namelist )
+bool is_name( const char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
 
@@ -927,7 +352,7 @@ bool is_name( const char *str, const char *namelist )
    }
 }
 
-bool is_name_prefix( const char *str, const char *namelist )
+bool is_name_prefix( const char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
 
@@ -945,7 +370,7 @@ bool is_name_prefix( const char *str, const char *namelist )
  * See if a string is one of the names of an object.		-Thoric
  * Treats a dash as a word delimiter as well as a space
  */
-bool is_name2( const char *str, const char *namelist )
+bool is_name2( const char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
 
@@ -959,7 +384,7 @@ bool is_name2( const char *str, const char *namelist )
    }
 }
 
-bool is_name2_prefix( const char *str, const char *namelist )
+bool is_name2_prefix( const char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
 
@@ -973,50 +398,40 @@ bool is_name2_prefix( const char *str, const char *namelist )
    }
 }
 
-/* Rewrote the 'nifty' functions since they mistakenly allowed for all objects
-   to be selected by specifying an empty list like -, '', "", ', " etc,
-   example: ofind -, c loc ''  - Luc 08/2000 */
-bool nifty_is_name( const char *str, const char *namelist )
+/*								-Thoric
+ * Checks if str is a name in namelist supporting multiple keywords
+ */
+bool nifty_is_name( char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
-   bool valid = FALSE;
 
-   if( !str || !str[0] )
+   if( !str || str[0] == '\0' )
       return FALSE;
 
    for( ;; )
    {
       str = one_argument2( str, name );
-      if( *name )
-      {
-         valid = TRUE;
-         if( !is_name2( name, namelist ) )
-            return FALSE;
-      }
-      if( !*str )
-         return valid;
+      if( name[0] == '\0' )
+         return TRUE;
+      if( !is_name2( name, namelist ) )
+         return FALSE;
    }
 }
 
-bool nifty_is_name_prefix( const char *str, const char *namelist )
+bool nifty_is_name_prefix( char *str, char *namelist )
 {
    char name[MAX_INPUT_LENGTH];
-   bool valid = FALSE;
 
-   if( !str || !str[0] )
+   if( !str || str[0] == '\0' )
       return FALSE;
 
    for( ;; )
    {
       str = one_argument2( str, name );
-      if( *name )
-      {
-         valid = TRUE;
-         if( !is_name2_prefix( name, namelist ) )
-            return FALSE;
-      }
-      if( !*str )
-         return valid;
+      if( name[0] == '\0' )
+         return TRUE;
+      if( !is_name2_prefix( name, namelist ) )
+         return FALSE;
    }
 }
 
@@ -1076,19 +491,17 @@ void modify_skill( CHAR_DATA * ch, int sn, int mod, bool fAdd )
  */
 void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
 {
-   OBJ_DATA *WPos, *DPos, *MPos, *ToDrop;
-   int WWeight, DWeight, MWeight, ToDropW;
+   OBJ_DATA *wield;
    int mod;
    struct skill_type *skill;
    ch_ret retcode;
-   int location = paf->location % REVERSE_APPLY;
 
    mod = paf->modifier;
 
    if( fAdd )
    {
       xSET_BITS( ch->affected_by, paf->bitvector );
-      if( location == APPLY_RECURRINGSPELL )
+      if( paf->location % REVERSE_APPLY == APPLY_RECURRINGSPELL )
       {
          mod = abs( mod );
          if( IS_VALID_SN( mod ) && ( skill = skill_table[mod] ) != NULL && skill->type == SKILL_SPELL )
@@ -1107,7 +520,8 @@ void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
        * the removed spell's information somewhere...    -Thoric
        * (Though we could keep the affect, but disable it for a duration)
        */
-      if( location == APPLY_RECURRINGSPELL )
+
+      if( paf->location % REVERSE_APPLY == APPLY_RECURRINGSPELL )
       {
          mod = abs( mod );
          if( !IS_VALID_SN( mod ) || ( skill = skill_table[mod] ) == NULL || skill->type != SKILL_SPELL )
@@ -1116,7 +530,7 @@ void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
          return;
       }
 
-      switch ( location )
+      switch ( paf->location % REVERSE_APPLY )
       {
          case APPLY_AFFECT:
             REMOVE_BIT( ch->affected_by.bits[0], mod );
@@ -1142,10 +556,10 @@ void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
       mod = 0 - mod;
    }
 
-   switch ( location )
+   switch ( paf->location % REVERSE_APPLY )
    {
       default:
-         bug( "%s: unknown location %d. (%s)", __func__, paf->location, ch->name );
+         bug( "Affect_modify: unknown location %d.", paf->location );
          return;
 
       case APPLY_NONE:
@@ -1305,16 +719,11 @@ void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
             bug( "affect_modify: APPLY_STRIPSN invalid sn %d", mod );
          break;
 
-         /*
-          * spell cast upon wear/removal of an object -Thoric 
-          */
+/* spell cast upon wear/removal of an object	-Thoric */
       case APPLY_WEARSPELL:
       case APPLY_REMOVESPELL:
-         if( xIS_SET( ch->in_room->room_flags, ROOM_NO_MAGIC ) || IS_SET( ch->immune, RIS_MAGIC )
-          || ( ( paf->location % REVERSE_APPLY ) == APPLY_WEARSPELL && !fAdd )
-          || ( ( paf->location % REVERSE_APPLY ) == APPLY_REMOVESPELL && fAdd )
-          || saving_char == ch   /* so save/quit doesn't trigger */
-          || loading_char == ch )   /* so loading doesn't trigger */
+         if( IS_SET( ch->in_room->room_flags, ROOM_NO_MAGIC ) || IS_SET( ch->immune, RIS_MAGIC ) || ( ( paf->location % REVERSE_APPLY ) == APPLY_WEARSPELL && !fAdd ) || ( ( paf->location % REVERSE_APPLY ) == APPLY_REMOVESPELL && !fAdd ) || saving_char == ch /* so save/quit doesn't trigger */
+             || loading_char == ch )   /* so loading doesn't trigger */
             return;
 
          mod = abs( mod );
@@ -1430,42 +839,26 @@ void affect_modify( CHAR_DATA * ch, AFFECT_DATA * paf, bool fAdd )
     * Check for weapon wielding.
     * Guard against recursion (for weapons with affects).
     */
-   ToDrop = WPos = get_eq_char( ch, WEAR_WIELD );
-   ToDropW = WWeight = WPos ? get_obj_weight( WPos ) : 0;
-   DWeight = MWeight = 0;
-   DPos = get_eq_char( ch, WEAR_DUAL_WIELD );
-   if( DPos && ( DWeight = get_obj_weight( DPos ) ) > ToDropW )
-   {
-      ToDrop = DPos;
-      ToDropW = WWeight;
-   }
-   MPos = get_eq_char( ch, WEAR_MISSILE_WIELD );
-   if( MPos && ( MWeight = get_obj_weight( MPos ) ) > ToDropW )
-   {
-      ToDrop = MPos;
-      ToDropW = MWeight;
-   }
-
-   if( !IS_NPC( ch ) && saving_char != ch
-       /*
-        * &&  (wield = get_eq_char(ch, WEAR_WIELD) ) != NULL
-        * &&   get_obj_weight(wield) > str_app[get_curr_str(ch)].wield ) 
-        */
-       && ( WWeight + DWeight + MWeight ) > str_app[get_curr_str( ch )].wield )
+   if( !IS_NPC( ch )
+       && saving_char != ch
+       && ( wield = get_eq_char( ch, WEAR_WIELD ) ) != NULL && get_obj_weight( wield ) > str_app[get_curr_str( ch )].wield )
    {
       static int depth;
 
-      if( depth <= 1 )
+      if( depth == 0 )
       {
          depth++;
-         act( AT_ACTION, "You are too weak to wield $p any longer.", ch, ToDrop, NULL, TO_CHAR );
-         act( AT_ACTION, "$n stops wielding $p.", ch, ToDrop, NULL, TO_ROOM );
-         unequip_char( ch, ToDrop );
+         act( AT_ACTION, "You are too weak to wield $p any longer.", ch, wield, NULL, TO_CHAR );
+         act( AT_ACTION, "$n stops wielding $p.", ch, wield, NULL, TO_ROOM );
+         unequip_char( ch, wield );
          depth--;
       }
    }
+
    return;
 }
+
+
 
 /*
  * Give an affect to a char.
@@ -1476,13 +869,13 @@ void affect_to_char( CHAR_DATA * ch, AFFECT_DATA * paf )
 
    if( !ch )
    {
-      bug( "%s (NULL, %d)", __func__, paf ? paf->type : 0 );
+      bug( "Affect_to_char(NULL, %d)", paf ? paf->type : 0 );
       return;
    }
 
    if( !paf )
    {
-      bug( "%s (%s, NULL)", __func__, ch->name );
+      bug( "Affect_to_char(%s, NULL)", ch->name );
       return;
    }
 
@@ -1495,15 +888,9 @@ void affect_to_char( CHAR_DATA * ch, AFFECT_DATA * paf )
    paf_new->bitvector = paf->bitvector;
 
    affect_modify( ch, paf_new, TRUE );
-
-   /*
-    * SMAUG's support (not complete in stock SMAUG) for player affects
-    * affecting a room (only "light" is supported).
-    */
-   if( ch->in_room )
-      room_affect( ch->in_room, paf_new, TRUE );
    return;
 }
+
 
 /*
  * Remove an affect from a char.
@@ -1512,18 +899,11 @@ void affect_remove( CHAR_DATA * ch, AFFECT_DATA * paf )
 {
    if( !ch->first_affect )
    {
-      bug( "%s (%s, %d): no affect.", __func__, ch->name, paf ? paf->type : 0 );
+      bug( "Affect_remove(%s, %d): no affect.", ch->name, paf ? paf->type : 0 );
       return;
    }
 
    affect_modify( ch, paf, FALSE );
-
-   /*
-    * SMAUG's support (not complete in stock SMAUG) for player affects
-    * affecting a room (only "light" is supported).
-    */
-   if( ch->in_room )
-      room_affect( ch->in_room, paf, FALSE );
 
    UNLINK( paf, ch->first_affect, ch->last_affect, next, prev );
    DISPOSE( paf );
@@ -1548,6 +928,8 @@ void affect_strip( CHAR_DATA * ch, int sn )
    return;
 }
 
+
+
 /*
  * Return true if a char is affected by a spell.
  */
@@ -1562,6 +944,7 @@ bool is_affected( CHAR_DATA * ch, int sn )
    return FALSE;
 }
 
+
 /*
  * Add or enhance an affect.
  * Limitations put in place by Thoric, they may be high... but at least
@@ -1572,7 +955,6 @@ void affect_join( CHAR_DATA * ch, AFFECT_DATA * paf )
    AFFECT_DATA *paf_old;
 
    for( paf_old = ch->first_affect; paf_old; paf_old = paf_old->next )
-   {
       if( paf_old->type == paf->type )
       {
          paf->duration = UMIN( 1000000, paf->duration + paf_old->duration );
@@ -1583,20 +965,19 @@ void affect_join( CHAR_DATA * ch, AFFECT_DATA * paf )
          affect_remove( ch, paf_old );
          break;
       }
-   }
+
    affect_to_char( ch, paf );
    return;
 }
+
 
 /*
  * Apply only affected and RIS on a char
  */
 void aris_affect( CHAR_DATA * ch, AFFECT_DATA * paf )
 {
-   int location = paf->location % REVERSE_APPLY;
-
    xSET_BITS( ch->affected_by, paf->bitvector );
-   switch ( location )
+   switch ( paf->location % REVERSE_APPLY )
    {
       case APPLY_AFFECT:
          SET_BIT( ch->affected_by.bits[0], paf->modifier );
@@ -1604,11 +985,11 @@ void aris_affect( CHAR_DATA * ch, AFFECT_DATA * paf )
       case APPLY_RESISTANT:
          SET_BIT( ch->resistant, paf->modifier );
          break;
-      case APPLY_SUSCEPTIBLE:
-         SET_BIT( ch->susceptible, paf->modifier );
-         break;
       case APPLY_IMMUNE:
          SET_BIT( ch->immune, paf->modifier );
+         break;
+      case APPLY_SUSCEPTIBLE:
+         SET_BIT( ch->susceptible, paf->modifier );
          break;
    }
 }
@@ -1681,17 +1062,6 @@ void update_aris( CHAR_DATA * ch )
       aris_affect( ch, paf );
 
    /*
-    * Add in effect from room 
-    */
-   if( ch->in_room )
-   {
-      for( paf = ch->in_room->first_affect; paf; paf = paf->next )
-         aris_affect( ch, paf );
-      for( paf = ch->in_room->first_permaffect; paf; paf = paf->next )
-         aris_affect( ch, paf );
-   }
-
-   /*
     * Add in effects from equipment 
     */
    for( obj = ch->first_carrying; obj; obj = obj->next_content )
@@ -1740,6 +1110,7 @@ void update_aris( CHAR_DATA * ch )
    return;
 }
 
+
 /*
  * Move a char out of a room.
  */
@@ -1758,8 +1129,7 @@ void char_from_room( CHAR_DATA * ch )
       --ch->in_room->area->nplayer;
 
    if( ( obj = get_eq_char( ch, WEAR_LIGHT ) ) != NULL
-       && obj->item_type == ITEM_LIGHT
-       && ( obj->value[2] != 0 || IS_SET( obj->value[3], PIPE_LIT ) ) && ch->in_room->light > 0 )
+       && obj->item_type == ITEM_LIGHT && obj->value[2] != 0 && ch->in_room->light > 0 )
       --ch->in_room->light;
 
    /*
@@ -1769,21 +1139,15 @@ void char_from_room( CHAR_DATA * ch )
       room_affect( ch->in_room, paf, FALSE );
 
    /*
-    * Remove room's affects on char.
-    * Do this even if the char died.  If ch is a player, then they are
-    * simply awaiting resurrection at the temple, in which case we
-    * still must remove these affects from them, lest they be corrupted.
+    * Room's affect on the character
     */
-   for( paf = ch->in_room->first_affect; paf; paf = paf->next )
+   if( !char_died( ch ) )
    {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_REMOVESPELL && paf->location != APPLY_STRIPSN )
+      for( paf = ch->in_room->first_affect; paf; paf = paf->next )
          affect_modify( ch, paf, FALSE );
-   }
 
-   for( paf = ch->in_room->first_permaffect; paf; paf = paf->next )
-   {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_REMOVESPELL && paf->location != APPLY_STRIPSN )
-         affect_modify( ch, paf, FALSE );
+      if( char_died( ch ) )   /* could die from removespell, etc */
+         return;
    }
 
    UNLINK( ch, ch->in_room->first_person, ch->in_room->last_person, next_in_room, prev_in_room );
@@ -1808,13 +1172,13 @@ void char_to_room( CHAR_DATA * ch, ROOM_INDEX_DATA * pRoomIndex )
 
    if( !ch )
    {
-      bug( "%s: NULL ch!", __func__ );
+      bug( "%s: NULL ch!", __FUNCTION__ );
       return;
    }
 
    if( !pRoomIndex || !get_room_index( pRoomIndex->vnum ) )
    {
-      bug( "%s: %s -> NULL room!  Putting char in limbo (%d)", __func__, ch->name, ROOM_VNUM_LIMBO );
+      bug( "%s: %s -> NULL room!  Putting char in limbo (%d)", __FUNCTION__, ch->name, ROOM_VNUM_LIMBO );
       /*
        * This used to just return, but there was a problem with crashing
        * and I saw no reason not to just put the char in limbo.  -Narn
@@ -1827,34 +1191,23 @@ void char_to_room( CHAR_DATA * ch, ROOM_INDEX_DATA * pRoomIndex )
       ch->home_vnum = ch->in_room->vnum;
    LINK( ch, pRoomIndex->first_person, pRoomIndex->last_person, next_in_room, prev_in_room );
 
-   if( IS_IMMORTAL( ch ) )
-      rprog_imminfo_trigger( ch );
-
    if( !IS_NPC( ch ) )
       if( ++pRoomIndex->area->nplayer > pRoomIndex->area->max_players )
          pRoomIndex->area->max_players = pRoomIndex->area->nplayer;
 
-   if( ( obj = get_eq_char( ch, WEAR_LIGHT ) ) != NULL
-       && obj->item_type == ITEM_LIGHT && ( obj->value[2] != 0 || IS_SET( obj->value[3], PIPE_LIT ) ) )
+   if( ( obj = get_eq_char( ch, WEAR_LIGHT ) ) != NULL && obj->item_type == ITEM_LIGHT && obj->value[2] != 0 )
       ++pRoomIndex->light;
 
    /*
-    * Add the room's affects to the char.
-    * Even if the char died, we must do this, because the char
-    * is removed from the room on death, which causes the room
-    * affects to be removed from the char, and we must balance
-    * that out.
+    * Room's effect on the character
     */
-   for( paf = pRoomIndex->first_affect; paf; paf = paf->next )
+   if( !char_died( ch ) )
    {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_REMOVESPELL && paf->location != APPLY_STRIPSN )
+      for( paf = pRoomIndex->first_affect; paf; paf = paf->next )
          affect_modify( ch, paf, TRUE );
-   }
 
-   for( paf = pRoomIndex->first_permaffect; paf; paf = paf->next )
-   {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_REMOVESPELL && paf->location != APPLY_STRIPSN )
-         affect_modify( ch, paf, TRUE );
+      if( char_died( ch ) )   /* could die from a wearspell, etc */
+         return;
    }
 
    /*
@@ -1864,7 +1217,7 @@ void char_to_room( CHAR_DATA * ch, ROOM_INDEX_DATA * pRoomIndex )
       room_affect( pRoomIndex, paf, TRUE );
 
 
-   if( !IS_NPC( ch ) && xIS_SET( pRoomIndex->room_flags, ROOM_SAFE ) && get_timer( ch, TIMER_SHOVEDRAG ) <= 0 )
+   if( !IS_NPC( ch ) && IS_SET( pRoomIndex->room_flags, ROOM_SAFE ) && get_timer( ch, TIMER_SHOVEDRAG ) <= 0 )
       add_timer( ch, TIMER_SHOVEDRAG, 10, NULL, 0 );
                                                  /*-30 Seconds-*/
 
@@ -1872,7 +1225,7 @@ void char_to_room( CHAR_DATA * ch, ROOM_INDEX_DATA * pRoomIndex )
     * Delayed Teleport rooms             -Thoric
     * Should be the last thing checked in this function
     */
-   if( xIS_SET( pRoomIndex->room_flags, ROOM_TELEPORT ) && pRoomIndex->tele_delay > 0 )
+   if( IS_SET( pRoomIndex->room_flags, ROOM_TELEPORT ) && pRoomIndex->tele_delay > 0 )
    {
       TELEPORT_DATA *tele;
 
@@ -2019,7 +1372,7 @@ void obj_from_char( OBJ_DATA * obj )
 
    if( ( ch = obj->carried_by ) == NULL )
    {
-      bug( "%s: null ch.", __func__ );
+      bug( "%s: null ch.", __FUNCTION__ );
       return;
    }
 
@@ -2123,6 +1476,8 @@ OBJ_DATA *get_eq_char( CHAR_DATA * ch, int iWear )
    return maxobj;
 }
 
+
+
 /*
  * Equip a char with an obj.
  */
@@ -2133,13 +1488,13 @@ void equip_char( CHAR_DATA * ch, OBJ_DATA * obj, int iWear )
 
    if( obj->carried_by != ch )
    {
-      bug( "%s: obj not being carried by ch!", __func__ );
+      bug( "equip_char: obj not being carried by ch!" );
       return;
    }
 
    if( ( otmp = get_eq_char( ch, iWear ) ) != NULL && ( !otmp->pIndexData->layers || !obj->pIndexData->layers ) )
    {
-      bug( "%s: %s already equipped (%d).", __func__, ch->name, iWear );
+      bug( "Equip_char: already equipped (%d).", iWear );
       return;
    }
 
@@ -2158,7 +1513,7 @@ void equip_char( CHAR_DATA * ch, OBJ_DATA * obj, int iWear )
       }
       if( obj->carried_by )
          obj_from_char( obj );
-      obj = obj_to_room( obj, ch->in_room );
+      obj_to_room( obj, ch->in_room );
       oprog_zap_trigger( ch, obj );
       if( IS_SET( sysdata.save_flags, SV_ZAPDROP ) && !char_died( ch ) )
          save_char_obj( ch );
@@ -2177,12 +1532,13 @@ void equip_char( CHAR_DATA * ch, OBJ_DATA * obj, int iWear )
    for( paf = obj->first_affect; paf; paf = paf->next )
       affect_modify( ch, paf, TRUE );
 
-   if( loading_char != ch
-       && obj->item_type == ITEM_LIGHT && ( obj->value[2] != 0 || IS_SET( obj->value[3], PIPE_LIT ) ) && ch->in_room )
+   if( obj->item_type == ITEM_LIGHT && obj->value[2] != 0 && ch->in_room )
       ++ch->in_room->light;
 
    return;
 }
+
+
 
 /*
  * Unequip a char with an obj.
@@ -2190,22 +1546,12 @@ void equip_char( CHAR_DATA * ch, OBJ_DATA * obj, int iWear )
 void unequip_char( CHAR_DATA * ch, OBJ_DATA * obj )
 {
    AFFECT_DATA *paf;
-   OBJ_DATA *tobj;
 
    if( obj->wear_loc == WEAR_NONE )
    {
-      bug( "%s: already unequipped.", __func__ );
+      bug( "%s", "Unequip_char: already unequipped." );
       return;
    }
-
-   /*
-    * Bug fix to prevent dual wielding from getting stuck. Fix by Gianfranco
-    * * Finell   -- Shaddai
-    */
-   if( obj->wear_loc == WEAR_WIELD
-       && ch != saving_char
-       && ch != loading_char && ch != quitting_char && ( tobj = get_eq_char( ch, WEAR_DUAL_WIELD ) ) != NULL )
-      tobj->wear_loc = WEAR_WIELD;
 
    ch->carry_number += get_obj_number( obj );
    if( IS_OBJ_STAT( obj, ITEM_MAGIC ) )
@@ -2225,8 +1571,7 @@ void unequip_char( CHAR_DATA * ch, OBJ_DATA * obj )
    if( !obj->carried_by )
       return;
 
-   if( obj->item_type == ITEM_LIGHT
-       && ( obj->value[2] != 0 || IS_SET( obj->value[3], PIPE_LIT ) ) && ch->in_room && ch->in_room->light > 0 )
+   if( obj->item_type == ITEM_LIGHT && obj->value[2] != 0 && ch->in_room && ch->in_room->light > 0 )
       --ch->in_room->light;
 
    return;
@@ -2235,7 +1580,7 @@ void unequip_char( CHAR_DATA * ch, OBJ_DATA * obj )
 /*
  * Move an obj out of a room.
  */
-void write_corpses args( ( CHAR_DATA * ch, const char *name, OBJ_DATA * objrem ) );
+void write_corpses args( ( CHAR_DATA * ch, char *name, OBJ_DATA * objrem ) );
 
 int falling;
 
@@ -2267,7 +1612,6 @@ void obj_from_room( OBJ_DATA * obj )
    if( obj->item_type == ITEM_FIRE )
       obj->in_room->light -= obj->count;
 
-   obj->in_room->weight -= get_obj_weight( obj );
    obj->carried_by = NULL;
    obj->in_obj = NULL;
    obj->in_room = NULL;
@@ -2291,8 +1635,6 @@ OBJ_DATA *obj_to_room( OBJ_DATA * obj, ROOM_INDEX_DATA * pRoomIndex )
 
    for( paf = obj->pIndexData->first_affect; paf; paf = paf->next )
       room_affect( pRoomIndex, paf, TRUE );
-
-   pRoomIndex->weight += get_obj_weight( obj );
 
    for( otmp = pRoomIndex->first_content; otmp; otmp = otmp->next_content )
       if( ( oret = group_object( otmp, obj ) ) == otmp )
@@ -2328,6 +1670,7 @@ CHAR_DATA *carried_by( OBJ_DATA * obj )
    return obj->carried_by;
 }
 
+
 /*
  * Move an object into an object.
  */
@@ -2345,9 +1688,6 @@ OBJ_DATA *obj_to_obj( OBJ_DATA * obj, OBJ_DATA * obj_to )
    if( !in_magic_container( obj_to ) && ( who = carried_by( obj_to ) ) != NULL )
       who->carry_weight += get_obj_weight( obj );
 
-   if( obj_to->in_room )
-      obj_to->in_room->weight += get_obj_weight( obj );
-
    for( otmp = obj_to->first_content; otmp; otmp = otmp->next_content )
       if( ( oret = group_object( otmp, obj ) ) == otmp )
          return oret;
@@ -2361,6 +1701,7 @@ OBJ_DATA *obj_to_obj( OBJ_DATA * obj, OBJ_DATA * obj_to )
    return obj;
 }
 
+
 /*
  * Move an object out of an object.
  */
@@ -2371,7 +1712,7 @@ void obj_from_obj( OBJ_DATA * obj )
 
    if( ( obj_from = obj->in_obj ) == NULL )
    {
-      bug( "%s: null obj_from.", __func__ );
+      bug( "%s", "Obj_from_obj: null obj_from." );
       return;
    }
 
@@ -2388,8 +1729,6 @@ void obj_from_obj( OBJ_DATA * obj )
    obj->in_obj = NULL;
    obj->in_room = NULL;
    obj->carried_by = NULL;
-   if( obj_from->in_room )
-      obj_from->in_room->weight -= get_obj_weight( obj );
 
    if( !magic )
       for( ; obj_from; obj_from = obj_from->in_obj )
@@ -2409,7 +1748,7 @@ void extract_obj( OBJ_DATA * obj )
 
    if( obj_extracted( obj ) )
    {
-      bug( "%s: obj %d already extracted!", __func__, obj->pIndexData->vnum );
+      bug( "%s: obj %d already extracted!", __FUNCTION__, obj->pIndexData->vnum );
       return;
    }
 
@@ -2473,7 +1812,8 @@ void extract_obj( OBJ_DATA * obj )
       obj->first_extradesc = obj->last_extradesc = NULL;
    }
 
-   trworld_obj_check( obj );
+   if( obj == gobj_prev )
+      gobj_prev = obj->prev;
 
    for( RQueue = first_relation; RQueue; RQueue = rq_next )
    {
@@ -2514,32 +1854,32 @@ void extract_obj( OBJ_DATA * obj )
 void extract_char( CHAR_DATA * ch, bool fPull )
 {
    CHAR_DATA *wch;
-   OBJ_DATA *obj, *obj_prev;
+   OBJ_DATA *obj;
    char buf[MAX_STRING_LENGTH];
    ROOM_INDEX_DATA *location;
    REL_DATA *RQueue, *rq_next;
 
    if( !ch )
    {
-      bug( "%s: NULL ch.", __func__ );
+      bug( "%s: NULL ch.", __FUNCTION__ );
       return;
    }
 
    if( !ch->in_room )
    {
-      bug( "%s: %s in NULL room.", __func__, ch->name ? ch->name : "???" );
+      bug( "%s: %s in NULL room.", __FUNCTION__, ch->name ? ch->name : "???" );
       return;
    }
 
    if( ch == supermob )
    {
-      bug( "%s: ch == supermob!", __func__ );
+      bug( "%s: ch == supermob!", __FUNCTION__ );
       return;
    }
 
    if( char_died( ch ) )
    {
-      bug( "%s: %s already died!", __func__, ch->name );
+      bug( "%s: %s already died!", __FUNCTION__, ch->name );
       return;
    }
 
@@ -2565,7 +1905,8 @@ void extract_char( CHAR_DATA * ch, bool fPull )
       }
    }
 
-   trworld_char_check( ch );
+   if( gch_prev == ch )
+      gch_prev = ch->prev;
 
    if( fPull )
       die_follower( ch );
@@ -2574,7 +1915,6 @@ void extract_char( CHAR_DATA * ch, bool fPull )
 
    if( ch->mount )
    {
-      update_room_reset( ch, TRUE );
       xREMOVE_BIT( ch->mount->act, ACT_MOUNTED );
       ch->mount = NULL;
       ch->position = POS_STANDING;
@@ -2585,7 +1925,6 @@ void extract_char( CHAR_DATA * ch, bool fPull )
     */
    if( IS_NPC( ch ) )
    {
-      update_room_reset( ch, TRUE );
       xREMOVE_BIT( ch->act, ACT_MOUNTED );
       for( wch = first_char; wch; wch = wch->next )
       {
@@ -2609,21 +1948,8 @@ void extract_char( CHAR_DATA * ch, bool fPull )
       }
    }
 
-   /*
-    * Extract all possessions, unless rebirthing character then
-    * retain "permanent" objects   -Thoric
-    */
-   for( obj = ch->last_carrying; obj; obj = obj_prev )
-   {
-      obj_prev = obj->prev_content;
-      if( !fPull && IS_OBJ_STAT( obj, ITEM_PERMANENT ) )
-      {
-         if( obj->wear_loc != WEAR_NONE )
-            unequip_char( ch, obj );
-      }
-      else
-         extract_obj( obj );
-   }
+   while( ( obj = ch->last_carrying ) != NULL )
+      extract_obj( obj );
 
    char_from_room( ch );
 
@@ -2682,7 +2008,7 @@ void extract_char( CHAR_DATA * ch, bool fPull )
    if( ch->desc )
    {
       if( ch->desc->character != ch )
-         bug( "%s: char's descriptor points to another char", __func__ );
+         bug( "%s: char's descriptor points to another char", __FUNCTION__ );
       else
       {
          ch->desc->character = NULL;
@@ -2696,7 +2022,7 @@ void extract_char( CHAR_DATA * ch, bool fPull )
 /*
  * Find a char in the room.
  */
-CHAR_DATA *get_char_room( CHAR_DATA * ch, const char *argument )
+CHAR_DATA *get_char_room( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    CHAR_DATA *rch;
@@ -2750,7 +2076,7 @@ CHAR_DATA *get_char_room( CHAR_DATA * ch, const char *argument )
 /*
  * Find a char in the world.
  */
-CHAR_DATA *get_char_world( CHAR_DATA * ch, const char *argument )
+CHAR_DATA *get_char_world( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    CHAR_DATA *wch;
@@ -2872,7 +2198,7 @@ OBJ_DATA *get_obj_list( CHAR_DATA * ch, char *argument, OBJ_DATA * list )
 /*
  * Find an obj in a list...going the other way			-Thoric
  */
-OBJ_DATA *get_obj_list_rev( CHAR_DATA * ch, const char *argument, OBJ_DATA * list )
+OBJ_DATA *get_obj_list_rev( CHAR_DATA * ch, char *argument, OBJ_DATA * list )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -2918,7 +2244,7 @@ OBJ_DATA *get_obj_vnum( CHAR_DATA * ch, int vnum )
 /*
  * Find an obj in player's inventory.
  */
-OBJ_DATA *get_obj_carry( CHAR_DATA * ch, const char *argument )
+OBJ_DATA *get_obj_carry( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -2959,7 +2285,7 @@ OBJ_DATA *get_obj_carry( CHAR_DATA * ch, const char *argument )
 /*
  * Find an obj in player's equipment.
  */
-OBJ_DATA *get_obj_wear( CHAR_DATA * ch, const char *argument )
+OBJ_DATA *get_obj_wear( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -3001,7 +2327,7 @@ OBJ_DATA *get_obj_wear( CHAR_DATA * ch, const char *argument )
 /*
  * Find an obj in the room or in inventory.
  */
-OBJ_DATA *get_obj_here( CHAR_DATA * ch, const char *argument )
+OBJ_DATA *get_obj_here( CHAR_DATA * ch, char *argument )
 {
    OBJ_DATA *obj;
 
@@ -3023,7 +2349,7 @@ OBJ_DATA *get_obj_here( CHAR_DATA * ch, const char *argument )
 /*
  * Find an obj in the world.
  */
-OBJ_DATA *get_obj_world( CHAR_DATA * ch, const char *argument )
+OBJ_DATA *get_obj_world( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -3078,7 +2404,7 @@ bool ms_find_obj( CHAR_DATA * ch )
 {
    int ms = ch->mental_state;
    int drunk = IS_NPC( ch ) ? 0 : ch->pcdata->condition[COND_DRUNK];
-   const char *t;
+   char *t;
 
    /*
     * we're going to be nice and let nothing weird happen unless
@@ -3189,7 +2515,7 @@ bool ms_find_obj( CHAR_DATA * ch )
  * Generic get obj function that supports optional containers.	-Thoric
  * currently only used for "eat" and "quaff".
  */
-OBJ_DATA *find_obj( CHAR_DATA * ch, const char *argument, bool carryonly )
+OBJ_DATA *find_obj( CHAR_DATA * ch, char *argument, bool carryonly )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -3303,14 +2629,14 @@ bool room_is_dark( ROOM_INDEX_DATA * pRoomIndex )
 {
    if( !pRoomIndex )
    {
-      bug( "%s:: NULL pRoomIndex", __func__ );
+      bug( "%s:: NULL pRoomIndex", __FUNCTION__ );
       return TRUE;
    }
 
    if( pRoomIndex->light > 0 )
       return FALSE;
 
-   if( xIS_SET( pRoomIndex->room_flags, ROOM_DARK ) )
+   if( IS_SET( pRoomIndex->room_flags, ROOM_DARK ) )
       return TRUE;
 
    if( pRoomIndex->sector_type == SECT_INSIDE || pRoomIndex->sector_type == SECT_CITY )
@@ -3336,7 +2662,7 @@ CHAR_DATA *room_is_dnd( CHAR_DATA * ch, ROOM_INDEX_DATA * pRoomIndex )
       return NULL;
    }
 
-   if( !xIS_SET( pRoomIndex->room_flags, ROOM_DND ) )
+   if( !IS_SET( pRoomIndex->room_flags, ROOM_DND ) )
       return NULL;
 
    for( rch = pRoomIndex->first_person; rch; rch = rch->next_in_room )
@@ -3367,10 +2693,10 @@ bool room_is_private( ROOM_INDEX_DATA * pRoomIndex )
    for( rch = pRoomIndex->first_person; rch; rch = rch->next_in_room )
       count++;
 
-   if( xIS_SET( pRoomIndex->room_flags, ROOM_PRIVATE ) && count >= 2 )
+   if( IS_SET( pRoomIndex->room_flags, ROOM_PRIVATE ) && count >= 2 )
       return TRUE;
 
-   if( xIS_SET( pRoomIndex->room_flags, ROOM_SOLITARY ) && count >= 1 )
+   if( IS_SET( pRoomIndex->room_flags, ROOM_SOLITARY ) && count >= 1 )
       return TRUE;
 
    return FALSE;
@@ -3502,7 +2828,7 @@ bool can_see_obj( CHAR_DATA * ch, OBJ_DATA * obj )
  */
 bool can_drop_obj( CHAR_DATA * ch, OBJ_DATA * obj )
 {
-   if( !IS_OBJ_STAT( obj, ITEM_NODROP ) && !IS_OBJ_STAT( obj, ITEM_PERMANENT ) )
+   if( !IS_OBJ_STAT( obj, ITEM_NODROP ) )
       return TRUE;
 
    if( !IS_NPC( ch ) && ch->level >= LEVEL_IMMORTAL )
@@ -3517,7 +2843,7 @@ bool can_drop_obj( CHAR_DATA * ch, OBJ_DATA * obj )
 /*
  * Return ascii name of an item type.
  */
-const char *item_type_name( OBJ_DATA * obj )
+char *item_type_name( OBJ_DATA * obj )
 {
    if( obj->item_type < 1 || obj->item_type > MAX_ITEM_TYPE )
    {
@@ -3531,7 +2857,7 @@ const char *item_type_name( OBJ_DATA * obj )
 /*
  * Return ascii name of an affect location.
  */
-const char *affect_loc_name( int location )
+char *affect_loc_name( int location )
 {
    switch ( location )
    {
@@ -3698,7 +3024,7 @@ const char *affect_loc_name( int location )
 /*
  * Return ascii name of an affect bit vector.
  */
-const char *affect_bit_name( EXT_BV * vector )
+char *affect_bit_name( EXT_BV * vector )
 {
    static char buf[512];
 
@@ -3769,15 +3095,13 @@ const char *affect_bit_name( EXT_BV * vector )
       mudstrlcat( buf, " berserk", 512 );
    if( xIS_SET( *vector, AFF_AQUA_BREATH ) )
       mudstrlcat( buf, " aqua_breath", 512 );
-   if( xIS_SET( *vector, AFF_GRAPPLE ) )
-      mudstrlcat( buf, " grapple", 512 );
    return ( buf[0] != '\0' ) ? buf + 1 : ( char * )"none";
 }
 
 /*
  * Return ascii name of extra flags vector.
  */
-const char *extra_bit_name( EXT_BV * extra_flags )
+char *extra_bit_name( EXT_BV * extra_flags )
 {
    static char buf[512];
 
@@ -3836,10 +3160,6 @@ const char *extra_bit_name( EXT_BV * extra_flags )
       mudstrlcat( buf, " clan", 512 );
    if( xIS_SET( *extra_flags, ITEM_CLANCORPSE ) )
       mudstrlcat( buf, " clanbody", 512 );
-   if( xIS_SET( *extra_flags, ITEM_PERMANENT ) )
-      mudstrlcat( buf, " permanent", 512 );
-   if( xIS_SET( *extra_flags, ITEM_PERSONAL ) )
-      mudstrlcat( buf, " personal", 512 );
    if( xIS_SET( *extra_flags, ITEM_PROTOTYPE ) )
       mudstrlcat( buf, " prototype", 512 );
    return ( buf[0] != '\0' ) ? buf + 1 : ( char * )"none";
@@ -3848,7 +3168,7 @@ const char *extra_bit_name( EXT_BV * extra_flags )
 /*
  * Return ascii name of magic flags vector. - Scryn
  */
-const char *magic_bit_name( int magic_flags )
+char *magic_bit_name( int magic_flags )
 {
    static char buf[512];
 
@@ -3861,7 +3181,7 @@ const char *magic_bit_name( int magic_flags )
 /*
  * Return ascii name of pulltype exit setting.
  */
-const char *pull_type_name( int pulltype )
+char *pull_type_name( int pulltype )
 {
    if( pulltype >= PT_FIRE )
       return ex_pfire[pulltype - PT_FIRE];
@@ -3883,7 +3203,7 @@ const char *pull_type_name( int pulltype )
 ch_ret spring_trap( CHAR_DATA * ch, OBJ_DATA * obj )
 {
    int dam, typ, lev;
-   const char *txt;
+   char *txt;
    char buf[MAX_STRING_LENGTH];
    ch_ret retcode;
 
@@ -4103,7 +3423,6 @@ void clean_room( ROOM_INDEX_DATA * room )
    EXTRA_DESCR_DATA *ed, *ed_next;
    EXIT_DATA *pexit, *pexit_next;
    MPROG_DATA *mprog, *mprog_next;
-   AFFECT_DATA *paf;
 
    STRFREE( room->description );
    STRFREE( room->name );
@@ -4132,38 +3451,7 @@ void clean_room( ROOM_INDEX_DATA * room )
    }
    room->first_exit = NULL;
    room->last_exit = NULL;
-
-   /*
-    *  As part of cleaning the room, clean it's affects.
-    *  But take care to avoid char corruption.
-    */
-   while( ( paf = room->first_affect ) != NULL )
-   {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_WEAPONSPELL )
-      {
-         CHAR_DATA *vch;
-
-         for( vch = room->first_person; vch; vch = vch->next )
-            affect_modify( vch, paf, FALSE );
-      }
-      UNLINK( paf, room->first_affect, room->last_affect, next, prev );
-      DISPOSE( paf );
-   }
-
-   while( ( paf = room->first_permaffect ) != NULL )
-   {
-      if( paf->location != APPLY_WEARSPELL && paf->location != APPLY_WEAPONSPELL )
-      {
-         CHAR_DATA *vch;
-
-         for( vch = room->first_person; vch; vch = vch->next )
-            affect_modify( vch, paf, FALSE );
-      }
-      UNLINK( paf, room->first_permaffect, room->last_permaffect, next, prev );
-      DISPOSE( paf );
-   }
-
-   xCLEAR_BITS( room->room_flags );
+   room->room_flags = 0;
    room->sector_type = 0;
    room->light = 0;
 }
@@ -4373,25 +3661,6 @@ void fix_char( CHAR_DATA * ch )
    for( aff = ch->first_affect; aff; aff = aff->next )
       affect_modify( ch, aff, FALSE );
 
-   /*
-    * As part of returning the char to their "natural naked state",
-    * we must strip any room affects from them.
-    */
-   if( ch->in_room )
-   {
-      for( aff = ch->in_room->first_affect; aff; aff = aff->next )
-      {
-         if( aff->location != APPLY_WEARSPELL && aff->location != APPLY_REMOVESPELL && aff->location != APPLY_STRIPSN )
-            affect_modify( ch, aff, FALSE );
-      }
-
-      for( aff = ch->in_room->first_permaffect; aff; aff = aff->next )
-      {
-         if( aff->location != APPLY_WEARSPELL && aff->location != APPLY_REMOVESPELL && aff->location != APPLY_STRIPSN )
-            affect_modify( ch, aff, FALSE );
-      }
-   }
-
    xCLEAR_BITS( ch->affected_by );
    xSET_BITS( ch->affected_by, race_table[ch->race]->affected );
    ch->mental_state = -10;
@@ -4418,24 +3687,6 @@ void fix_char( CHAR_DATA * ch )
    for( aff = ch->first_affect; aff; aff = aff->next )
       affect_modify( ch, aff, TRUE );
 
-   /*
-    * Now that the char is fixed, add the room's affects back on.
-    */
-   if( ch->in_room )
-   {
-      for( aff = ch->in_room->first_affect; aff; aff = aff->next )
-      {
-         if( aff->location != APPLY_WEARSPELL && aff->location != APPLY_REMOVESPELL && aff->location != APPLY_STRIPSN )
-            affect_modify( ch, aff, TRUE );
-      }
-
-      for( aff = ch->in_room->first_permaffect; aff; aff = aff->next )
-      {
-         if( aff->location != APPLY_WEARSPELL && aff->location != APPLY_REMOVESPELL && aff->location != APPLY_STRIPSN )
-            affect_modify( ch, aff, TRUE );
-      }
-   }
-
    ch->carry_weight = 0;
    ch->carry_number = 0;
 
@@ -4449,6 +3700,7 @@ void fix_char( CHAR_DATA * ch )
 
    re_equip_char( ch );
 }
+
 
 /*
  * Show an affect verbosely to a character			-Thoric
@@ -4594,7 +3846,6 @@ void free_obj( OBJ_DATA * obj )
    STRFREE( obj->description );
    STRFREE( obj->short_descr );
    STRFREE( obj->action_desc );
-   STRFREE( obj->owner );
    DISPOSE( obj );
    return;
 }
@@ -4772,12 +4023,12 @@ bool can_astral( CHAR_DATA * ch, CHAR_DATA * victim )
 {
    if( victim == ch
        || !victim->in_room
-       || xIS_SET( victim->in_room->room_flags, ROOM_PRIVATE )
-       || xIS_SET( victim->in_room->room_flags, ROOM_SOLITARY )
-       || xIS_SET( victim->in_room->room_flags, ROOM_NO_ASTRAL )
-       || xIS_SET( victim->in_room->room_flags, ROOM_DEATH )
-       || xIS_SET( victim->in_room->room_flags, ROOM_PROTOTYPE )
-       || xIS_SET( ch->in_room->room_flags, ROOM_NO_RECALL )
+       || IS_SET( victim->in_room->room_flags, ROOM_PRIVATE )
+       || IS_SET( victim->in_room->room_flags, ROOM_SOLITARY )
+       || IS_SET( victim->in_room->room_flags, ROOM_NO_ASTRAL )
+       || IS_SET( victim->in_room->room_flags, ROOM_DEATH )
+       || IS_SET( victim->in_room->room_flags, ROOM_PROTOTYPE )
+       || IS_SET( ch->in_room->room_flags, ROOM_NO_RECALL )
        || victim->level >= ch->level + 15
        || ( CAN_PKILL( victim ) && !IS_NPC( ch ) && !CAN_PKILL( ch ) )
        || ( IS_NPC( victim ) && xIS_SET( victim->act, ACT_PROTOTYPE ) )
@@ -4873,6 +4124,7 @@ bool chance_attrib( CHAR_DATA * ch, short percent, short attrib )
 
 }
 
+
 /*
  * Make a simple clone of an object (no extras...yet)		-Thoric
  */
@@ -4886,7 +4138,6 @@ OBJ_DATA *clone_object( OBJ_DATA * obj )
    clone->short_descr = QUICKLINK( obj->short_descr );
    clone->description = QUICKLINK( obj->description );
    clone->action_desc = QUICKLINK( obj->action_desc );
-   clone->owner = QUICKLINK( obj->owner );
    clone->item_type = obj->item_type;
    clone->extra_flags = obj->extra_flags;
    clone->magic_flags = obj->magic_flags;
@@ -4928,30 +4179,11 @@ OBJ_DATA *group_object( OBJ_DATA * obj1, OBJ_DATA * obj2 )
       return obj1;
 
    if( obj1->pIndexData == obj2->pIndexData
-      && !str_cmp( obj1->name, obj2->name )
-      && !str_cmp( obj1->short_descr, obj2->short_descr )
-      && !str_cmp( obj1->description, obj2->description )
-      && !str_cmp( obj1->action_desc, obj2->action_desc )
-      && !str_cmp( obj1->owner, obj2->owner )
-      && obj1->item_type == obj2->item_type
-      && xSAME_BITS( obj1->extra_flags, obj2->extra_flags )
-      && obj1->magic_flags == obj2->magic_flags
-      && obj1->wear_flags == obj2->wear_flags
-      && obj1->wear_loc == obj2->wear_loc
-      && obj1->weight == obj2->weight
-      && obj1->cost == obj2->cost
-      && obj1->level == obj2->level
-      && obj1->timer == obj2->timer
-      && obj1->value[0] == obj2->value[0]
-      && obj1->value[1] == obj2->value[1]
-      && obj1->value[2] == obj2->value[2]
-      && obj1->value[3] == obj2->value[3]
-      && obj1->value[4] == obj2->value[4]
-      && obj1->value[5] == obj2->value[5]
-      && !obj1->first_extradesc && !obj2->first_extradesc
-      && !obj1->first_affect && !obj2->first_affect
-      && !obj1->first_content && !obj2->first_content
-      && obj1->count + obj2->count <= SHRT_MAX ) /* prevent count overflow */
+/*
+    &&	!obj1->pIndexData->mudprogs
+    &&  !obj2->pIndexData->mudprogs
+*/
+       && !str_cmp( obj1->name, obj2->name ) && !str_cmp( obj1->short_descr, obj2->short_descr ) && !str_cmp( obj1->description, obj2->description ) && !str_cmp( obj1->action_desc, obj2->action_desc ) && obj1->item_type == obj2->item_type && xSAME_BITS( obj1->extra_flags, obj2->extra_flags ) && obj1->magic_flags == obj2->magic_flags && obj1->wear_flags == obj2->wear_flags && obj1->wear_loc == obj2->wear_loc && obj1->weight == obj2->weight && obj1->cost == obj2->cost && obj1->level == obj2->level && obj1->timer == obj2->timer && obj1->value[0] == obj2->value[0] && obj1->value[1] == obj2->value[1] && obj1->value[2] == obj2->value[2] && obj1->value[3] == obj2->value[3] && obj1->value[4] == obj2->value[4] && obj1->value[5] == obj2->value[5] && !obj1->first_extradesc && !obj2->first_extradesc && !obj1->first_affect && !obj2->first_affect && !obj1->first_content && !obj2->first_content && obj1->count + obj2->count > 0 )   /* prevent count overflow */
    {
       obj1->count += obj2->count;
       obj1->pIndexData->count += obj2->count;   /* to be decremented in */
@@ -5014,17 +4246,14 @@ void separate_obj( OBJ_DATA * obj )
 bool empty_obj( OBJ_DATA * obj, OBJ_DATA * destobj, ROOM_INDEX_DATA * destroom )
 {
    OBJ_DATA *otmp, *otmp_next;
-   CHAR_DATA *ch;
+   CHAR_DATA *ch = obj->carried_by;
    bool movedsome = FALSE;
 
    if( !obj )
    {
-      bug( "%s: NULL obj", __func__ );
+      bug( "%s", "empty_obj: NULL obj" );
       return FALSE;
    }
-
-   ch = obj->carried_by;
-
    if( destobj || ( !destroom && !ch && ( destobj = obj->in_obj ) != NULL ) )
    {
       for( otmp = obj->first_content; otmp; otmp = otmp_next )
@@ -5039,10 +4268,7 @@ bool empty_obj( OBJ_DATA * obj, OBJ_DATA * destobj, ROOM_INDEX_DATA * destroom )
             continue;
          if( ( destobj->item_type == ITEM_CONTAINER || destobj->item_type == ITEM_KEYRING
                || destobj->item_type == ITEM_QUIVER )
-             && ( get_real_obj_weight( otmp ) + get_real_obj_weight( destobj ) > destobj->value[0]
-                  || ( destobj->in_room
-                       && destobj->in_room->max_weight
-                       && destobj->in_room->max_weight < get_real_obj_weight( otmp ) + destobj->in_room->weight ) ) )
+             && get_real_obj_weight( otmp ) + get_real_obj_weight( destobj ) > destobj->value[0] )
             continue;
          obj_from_obj( otmp );
          obj_to_obj( otmp, destobj );
@@ -5050,16 +4276,11 @@ bool empty_obj( OBJ_DATA * obj, OBJ_DATA * destobj, ROOM_INDEX_DATA * destroom )
       }
       return movedsome;
    }
-
    if( destroom || ( !ch && ( destroom = obj->in_room ) != NULL ) )
    {
       for( otmp = obj->first_content; otmp; otmp = otmp_next )
       {
          otmp_next = otmp->next_content;
-
-         if( destroom->max_weight && destroom->max_weight < get_real_obj_weight( otmp ) + destroom->weight )
-            continue;
-
          if( ch && HAS_PROG( otmp->pIndexData, DROP_PROG ) && otmp->count > 1 )
          {
             separate_obj( otmp );
@@ -5080,7 +4301,6 @@ bool empty_obj( OBJ_DATA * obj, OBJ_DATA * destobj, ROOM_INDEX_DATA * destroom )
       }
       return movedsome;
    }
-
    if( ch )
    {
       for( otmp = obj->first_content; otmp; otmp = otmp_next )
@@ -5092,8 +4312,7 @@ bool empty_obj( OBJ_DATA * obj, OBJ_DATA * destobj, ROOM_INDEX_DATA * destroom )
       }
       return movedsome;
    }
-
-   bug( "%s: could not determine a destination for vnum %d", __func__, obj->pIndexData->vnum );
+   bug( "empty_obj: could not determine a destination for vnum %d", obj->pIndexData->vnum );
    return FALSE;
 }
 
@@ -5138,6 +4357,7 @@ void worsen_mental_state( CHAR_DATA * ch, int mod )
    else
       ch->mental_state -= c;
 }
+
 
 /*
  * Add gold to an area's economy				-Thoric
@@ -5338,11 +4558,11 @@ void check_switches( bool possess )
       check_switch( ch, possess );
 }
 
-void check_switch( CHAR_DATA * ch, bool possess )
+void check_switch( CHAR_DATA *ch, bool possess )
 {
    AFFECT_DATA *paf;
    CMDTYPE *cmd;
-   int hash, trust = get_trust( ch );
+   int hash, trust = get_trust(ch);
 
    if( !ch->switched )
       return;
@@ -5367,8 +4587,8 @@ void check_switch( CHAR_DATA * ch, bool possess )
          if( cmd->level <= trust )
             return;
 
-         if( !IS_NPC( ch ) && ch->pcdata->bestowments && is_name( cmd->name, ch->pcdata->bestowments )
-             && cmd->level <= trust + sysdata.bestow_dif )
+         if( !IS_NPC(ch) && ch->pcdata->bestowments && is_name( cmd->name, ch->pcdata->bestowments )
+          && cmd->level <= trust + sysdata.bestow_dif )
             return;
       }
    }

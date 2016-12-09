@@ -10,9 +10,9 @@
  * Cameron Carroll (Cam), Cyberfox, Karangi, Rathian, Raine, and Adjani.    *
  * All Rights Reserved.                                                     *
  *                                                                          *
- * Original SMAUG 1.8b written by Thoric (Derek Snider) with Altrag,        *
+ * Original SMAUG 1.4a written by Thoric (Derek Snider) with Altrag,        *
  * Blodkai, Haus, Narn, Scryn, Swordbearer, Tricops, Gorog, Rennard,        *
- * Grishnakh, Fireblade, Edmond, Conran, and Nivek.                         *
+ * Grishnakh, Fireblade, and Nivek.                                         *
  *                                                                          *
  * Original MERC 2.1 code by Hatchet, Furey, and Kahn.                      *
  *                                                                          *
@@ -27,12 +27,12 @@
 #include <dirent.h>
 #include <unistd.h>
 #if !defined(WIN32)
-#include <dlfcn.h>
+ #include <dlfcn.h>
 #else
-#include <unistd.h>
-#include <windows.h>
-#define dlopen( libname, flags ) LoadLibrary( (libname) )
-#define dlclose( libname ) FreeLibrary( (HINSTANCE) (libname) )
+ #include <unistd.h>
+ #include <windows.h>
+ #define dlopen( libname, flags ) LoadLibrary( (libname) )
+ #define dlclose( libname ) FreeLibrary( (HINSTANCE) (libname) )
 #endif
 #include "mud.h"
 #include "mccp.h"
@@ -40,9 +40,8 @@
 #define MAX_NEST	100
 static OBJ_DATA *rgObjNest[MAX_NEST];
 
-bool write_to_descriptor( DESCRIPTOR_DATA * d, const char *txt, int length );
-bool write_to_descriptor_old( int desc, const char *txt, int length );
-void update_room_reset( CHAR_DATA *ch, bool setting );
+bool write_to_descriptor( DESCRIPTOR_DATA * d, char *txt, int length );
+bool write_to_descriptor_old( int desc, char *txt, int length );
 
 extern ROOM_INDEX_DATA *room_index_hash[MAX_KEY_HASH];
 
@@ -60,8 +59,6 @@ void save_mobile( FILE * fp, CHAR_DATA * mob )
    fprintf( fp, "Vnum	%d\n", mob->pIndexData->vnum );
    fprintf( fp, "Level   %d\n", mob->level );
    fprintf( fp, "Gold	%d\n", mob->gold );
-   fprintf( fp, "Resetvnum %d\n", mob->resetvnum );
-   fprintf( fp, "Resetnum  %d\n", mob->resetnum );
    if( mob->in_room )
    {
       if( xIS_SET( mob->act, ACT_SENTINEL ) )
@@ -118,6 +115,7 @@ void save_mobile( FILE * fp, CHAR_DATA * mob )
    re_equip_char( mob );
 
    fprintf( fp, "%s", "EndMobile\n\n" );
+   return;
 }
 
 void save_world( void )
@@ -148,7 +146,7 @@ void save_world( void )
          if( pRoomIndex )
          {
             if( !pRoomIndex->first_content   /* Skip room if nothing in it */
-                || xIS_SET( pRoomIndex->room_flags, ROOM_CLANSTOREROOM )   /* These rooms save on their own */
+                || IS_SET( pRoomIndex->room_flags, ROOM_CLANSTOREROOM ) /* These rooms save on their own */
                 )
                continue;
 
@@ -199,7 +197,7 @@ CHAR_DATA *load_mobile( FILE * fp )
       vnum = fread_number( fp );
       if( get_mob_index( vnum ) == NULL )
       {
-         bug( "%s: No index data for vnum %d", __func__, vnum );
+         bug( "%s: No index data for vnum %d", __FUNCTION__, vnum );
          return NULL;
       }
       mob = create_mobile( get_mob_index( vnum ) );
@@ -215,7 +213,7 @@ CHAR_DATA *load_mobile( FILE * fp )
             if( !str_cmp( word, "EndMobile" ) )
                break;
          }
-         bug( "%s: Unable to create mobile for vnum %d", __func__, vnum );
+         bug( "%s: Unable to create mobile for vnum %d", __FUNCTION__, vnum );
          return NULL;
       }
    }
@@ -232,7 +230,7 @@ CHAR_DATA *load_mobile( FILE * fp )
             break;
       }
       extract_char( mob, TRUE );
-      bug( "%s: Vnum not found", __func__ );
+      bug( "%s: Vnum not found", __FUNCTION__ );
       return NULL;
    }
 
@@ -273,7 +271,7 @@ CHAR_DATA *load_mobile( FILE * fp )
                   if( ( sn = skill_lookup( sname ) ) < 0 )
                   {
                      if( ( sn = herb_lookup( sname ) ) < 0 )
-                        bug( "%s: unknown skill.", __func__ );
+                        bug( "%s: unknown skill.", __FUNCTION__ );
                      else
                         sn += TYPE_HERB;
                   }
@@ -330,7 +328,6 @@ CHAR_DATA *load_mobile( FILE * fp )
                   pRoomIndex = get_room_index( ROOM_VNUM_LIMBO );
                char_to_room( mob, pRoomIndex );
                mob->tempnum = -9998;   /* Yet another hackish fix! */
-               update_room_reset( mob, false );
                return mob;
             }
             if( !str_cmp( word, "End" ) ) /* End of object, need to ignore this. sometimes they creep in there somehow -- Scion */
@@ -390,8 +387,6 @@ CHAR_DATA *load_mobile( FILE * fp )
 
          case 'R':
             KEY( "Room", inroom, fread_number( fp ) );
-            KEY( "Resetvnum", mob->resetvnum, fread_number( fp ) );
-            KEY( "Resetnum", mob->resetnum, fread_number( fp ) );
             break;
 
          case 'S':
@@ -407,7 +402,7 @@ CHAR_DATA *load_mobile( FILE * fp )
 
       if( !fMatch && str_cmp( word, "End" ) )
       {
-         bug( "%s: no match: %s", __func__, word );
+         bug( "%s: no match: %s", __FUNCTION__, word );
          fread_to_eol( fp );
       }
    }
@@ -433,12 +428,14 @@ void read_obj_file( char *dirname, char *filename )
    if( ( fp = fopen( fname, "r" ) ) != NULL )
    {
       short iNest;
+      bool found;
       OBJ_DATA *tobj, *tobj_next;
 
       rset_supermob( room );
       for( iNest = 0; iNest < MAX_NEST; iNest++ )
          rgObjNest[iNest] = NULL;
 
+      found = TRUE;
       for( ;; )
       {
          char letter;
@@ -453,7 +450,7 @@ void read_obj_file( char *dirname, char *filename )
 
          if( letter != '#' )
          {
-            bug( "%s: # not found.", __func__ );
+            bug( "%s", "read_obj_file: # not found." );
             break;
          }
 
@@ -464,7 +461,7 @@ void read_obj_file( char *dirname, char *filename )
             break;
          else
          {
-            bug( "%s: bad section: %s", __func__, word );
+            bug( "read_obj_file: bad section: %s", word );
             break;
          }
       }
@@ -563,10 +560,9 @@ void load_world( void )
                done++;
          }
       }
+      fclose( mobfp );
+      mobfp = NULL;
    }
-
-   fclose( mobfp );
-   mobfp = NULL;
 
    load_obj_files(  );
 
@@ -578,7 +574,7 @@ void load_world( void )
 }
 
 /*  Warm reboot stuff, gotta make sure to thank Erwin for this :) */
-void do_hotboot( CHAR_DATA* ch, const char* argument)
+void do_hotboot( CHAR_DATA * ch, char *argument )
 {
    FILE *fp;
    CHAR_DATA *victim = NULL;
@@ -639,7 +635,7 @@ void do_hotboot( CHAR_DATA* ch, const char* argument)
     * And this one here will save the status of all objects and mobs in the game.
     * * This really should ONLY ever be used here. The less we do stuff like this the better.
     */
-   save_world(  );
+   save_world( );
 
    log_string( "Saving player files and connection states...." );
    if( ch && ch->desc )
@@ -717,8 +713,8 @@ void do_hotboot( CHAR_DATA* ch, const char* argument)
    sysdata.dlHandle = dlopen( NULL, RTLD_LAZY );
    if( !sysdata.dlHandle )
    {
-      bug( "%s", "FATAL ERROR: Unable to reopen system executable handle!" );
-      exit( 1 );
+	bug( "%s", "FATAL ERROR: Unable to reopen system executable handle!" );
+	exit( 1 );
    }
 
    bug( "%s", "Hotboot execution failed!!" );

@@ -1,55 +1,57 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                           Regular update module                          *
+ *			      Regular update module			    *
  ****************************************************************************/
 
 #include <stdio.h>
 #include <sys/time.h>
 #include "mud.h"
-#include "hint.h"
 
 /*
  * Local functions.
  */
-int hit_gain( CHAR_DATA * ch );
-int mana_gain( CHAR_DATA * ch );
-int move_gain( CHAR_DATA * ch );
-void mobile_update( void );
-void time_update( void );  /* FB */
-void char_update( void );
-void obj_update( void );
-void aggr_update( void );
-void room_act_update( void );
-void obj_act_update( void );
-void char_check( void );
-void drunk_randoms( CHAR_DATA * ch );
-void hallucinations( CHAR_DATA * ch );
-void subtract_times( struct timeval *etime, struct timeval *sttime );
+int hit_gain args( ( CHAR_DATA * ch ) );
+int mana_gain args( ( CHAR_DATA * ch ) );
+int move_gain args( ( CHAR_DATA * ch ) );
+void mobile_update args( ( void ) );
+void time_update args( ( void ) );  /* FB */
+void char_update args( ( void ) );
+void obj_update args( ( void ) );
+void aggr_update args( ( void ) );
+void room_act_update args( ( void ) );
+void obj_act_update args( ( void ) );
+void char_check args( ( void ) );
+void drunk_randoms args( ( CHAR_DATA * ch ) );
+void hallucinations args( ( CHAR_DATA * ch ) );
+void subtract_times args( ( struct timeval * etime, struct timeval * sttime ) );
 
-/* From interp.c */
-bool check_social( CHAR_DATA * ch, const char *command, const char *argument );
-
-/* From house.c */
-void homebuy_update(  );
+/* weather functions - FB */
+void adjust_vectors args( ( WEATHER_DATA * weather ) );
+void get_weather_echo args( ( WEATHER_DATA * weather ) );
+void get_time_echo args( ( WEATHER_DATA * weather ) );
 
 /*
  * Global Variables
  */
+
+CHAR_DATA *gch_prev;
+OBJ_DATA *gobj_prev;
+
 CHAR_DATA *timechar;
 
-const char *corpse_descs[] = {
+char *corpse_descs[] = {
    "The corpse of %s is in the last stages of decay.",
    "The corpse of %s is crawling with vermin.",
    "The corpse of %s fills the air with a foul stench.",
@@ -65,12 +67,16 @@ extern int top_exit;
 void advance_level( CHAR_DATA * ch )
 {
    char buf[MAX_STRING_LENGTH];
-   int add_hp, add_mana, add_move, add_prac;
+   int add_hp;
+   int add_mana;
+   int add_move;
+   int add_prac;
 
    snprintf( buf, MAX_STRING_LENGTH, "the %s", title_table[ch->Class][ch->level][ch->sex == SEX_FEMALE ? 1 : 0] );
    set_title( ch, buf );
 
-   add_hp = con_app[get_curr_con( ch )].hitp + number_range( class_table[ch->Class]->hp_min, class_table[ch->Class]->hp_max );
+   add_hp = con_app[get_curr_con( ch )].hitp + number_range( class_table[ch->Class]->hp_min,
+                                                             class_table[ch->Class]->hp_max );
    add_mana = class_table[ch->Class]->fMana ? number_range( 2, ( 2 * get_curr_int( ch ) + get_curr_wis( ch ) ) / 8 ) : 0;
    add_move = number_range( 5, ( get_curr_con( ch ) + get_curr_dex( ch ) ) / 4 );
    add_prac = wis_app[get_curr_wis( ch )].practice;
@@ -106,12 +112,11 @@ void advance_level( CHAR_DATA * ch )
          if( d->connected == CON_PLAYING && d->character != ch )
          {
             set_char_color( AT_IMMORT, d->character );
-            ch_printf( d->character, "%s has attained the rank of Avatar!\r\n", ch->name );
+            ch_printf( d->character, "%s has just achieved Avatarhood!\r\n", ch->name );
          }
       set_char_color( AT_WHITE, ch );
       do_help( ch, "M_ADVHERO_" );
    }
-
    if( ch->level < LEVEL_IMMORTAL )
    {
       if( IS_VAMPIRE( ch ) )
@@ -125,6 +130,7 @@ void advance_level( CHAR_DATA * ch )
       set_char_color( AT_WHITE, ch );
       send_to_char( buf, ch );
    }
+   return;
 }
 
 void gain_exp( CHAR_DATA * ch, int gain )
@@ -179,16 +185,13 @@ void gain_exp( CHAR_DATA * ch, int gain )
       }
    }
 
-   if( IS_PKILL( ch ) )
-      modgain = ( modgain * sysdata.deadly_exp_mod ) / 100;
-   else
-      modgain = ( modgain * sysdata.peaceful_exp_mod ) / 100;
-
    /*
     * xp cap to prevent any one event from giving enuf xp to 
+    */
+   /*
     * gain more than one level - FB 
     */
-   modgain = UMIN( (int)modgain, exp_level( ch, ch->level + 2 ) - exp_level( ch, ch->level + 1 ) );
+   modgain = UMIN( modgain, exp_level( ch, ch->level + 2 ) - exp_level( ch, ch->level + 1 ) );
 
    ch->exp = UMAX( 0, ch->exp + ( int )modgain );
 
@@ -206,7 +209,7 @@ void gain_exp( CHAR_DATA * ch, int gain )
       ch_printf( ch, "You have now obtained experience level %d!\r\n", ch->level );
       advance_level( ch );
    }
-   save_char_obj( ch );
+   return;
 }
 
 /*
@@ -551,6 +554,7 @@ void gain_condition( CHAR_DATA * ch, int iCond, int value )
             break;
       }
    }
+   return;
 }
 
 /*
@@ -565,13 +569,13 @@ void check_alignment( CHAR_DATA * ch )
    if( ch->alignment < race_table[ch->race]->minalign )
    {
       set_char_color( AT_BLOOD, ch );
-      send_to_char( "Your actions have been incompatible with the ideals of your race.  This troubles you.\r\n", ch );
+      send_to_char( "Your actions have been incompatible with the ideals of your race.  This troubles you.", ch );
    }
 
    if( ch->alignment > race_table[ch->race]->maxalign )
    {
       set_char_color( AT_BLOOD, ch );
-      send_to_char( "Your actions have been incompatible with the ideals of your race.  This troubles you.\r\n", ch );
+      send_to_char( "Your actions have been incompatible with the ideals of your race.  This troubles you.", ch );
    }
 
    /*
@@ -587,7 +591,6 @@ void check_alignment( CHAR_DATA * ch )
          worsen_mental_state( ch, 15 );
          return;
       }
-
       if( ch->alignment < 500 )
       {
          set_char_color( AT_BLOOD, ch );
@@ -608,7 +611,6 @@ void mobile_update( void )
    char buf[MAX_STRING_LENGTH];
    CHAR_DATA *ch;
    EXIT_DATA *pexit;
-   TRV_WORLD *lc;
    int door;
    ch_ret retcode;
 
@@ -617,10 +619,25 @@ void mobile_update( void )
    /*
     * Examine all mobs. 
     */
-   lc = trworld_create( TR_CHAR_WORLD_BACK );
-   for( ch = last_char; ch; ch = trvch_wnext( lc ) )
+   for( ch = last_char; ch; ch = gch_prev )
    {
       set_cur_char( ch );
+      if( ch == first_char && ch->prev )
+      {
+         bug( "%s", "mobile_update: first_char->prev != NULL... fixed" );
+         ch->prev = NULL;
+      }
+
+      gch_prev = ch->prev;
+
+      if( gch_prev && gch_prev->next != ch )
+      {
+         bug( "FATAL: Mobile_update: %s->prev->next doesn't point to ch.", ch->name );
+         bug( "%s", "Short-cutting here" );
+         gch_prev = NULL;
+         ch->prev = NULL;
+         do_shout( ch, "Thoric says, 'Prepare for the worst!'" );
+      }
 
       if( !IS_NPC( ch ) )
       {
@@ -629,12 +646,13 @@ void mobile_update( void )
          continue;
       }
 
-      if( !ch->in_room || IS_AFFECTED( ch, AFF_CHARM ) || IS_AFFECTED( ch, AFF_PARALYSIS ) || IS_AFFECTED( ch, AFF_POSSESS ) )
+      if( !ch->in_room || IS_AFFECTED( ch, AFF_CHARM ) || IS_AFFECTED( ch, AFF_PARALYSIS ) )
          continue;
 
       /*
        * Clean up 'animated corpses' that are not charmed' - Scryn 
        */
+
       if( ch->pIndexData->vnum == MOB_VNUM_ANIMATED_CORPSE && !IS_AFFECTED( ch, AFF_CHARM ) )
       {
          if( ch->in_room->first_person )
@@ -648,6 +666,13 @@ void mobile_update( void )
       if( !xIS_SET( ch->act, ACT_RUNNING ) && !xIS_SET( ch->act, ACT_SENTINEL ) && !ch->fighting && ch->hunting )
       {
          WAIT_STATE( ch, 2 * PULSE_VIOLENCE );
+         /*
+          * Commented out temporarily to avoid spam - Scryn 
+          * snprintf( buf, MAX_STRING_LENGTH, "%s hunting %s from %s.", ch->name,
+          * ch->hunting->name,
+          * ch->in_room->name );
+          * log_string( buf ); 
+          */
          hunt_victim( ch );
          continue;
       }
@@ -655,7 +680,7 @@ void mobile_update( void )
       /*
        * Examine call for special procedure 
        */
-      if( !xIS_SET( ch->act, ACT_RUNNING ) && ch->spec_fun && !IS_AFFECTED( ch, AFF_POSSESS ) )
+      if( !xIS_SET( ch->act, ACT_RUNNING ) && ch->spec_fun )
       {
          if( ( *ch->spec_fun ) ( ch ) )
             continue;
@@ -666,7 +691,7 @@ void mobile_update( void )
       /*
        * Check for mudprogram script on mob 
        */
-      if( HAS_PROG( ch->pIndexData, SCRIPT_PROG ) && !xIS_SET( ch->act, ACT_STOP_SCRIPT ) )
+      if( HAS_PROG( ch->pIndexData, SCRIPT_PROG ) )
       {
          mprog_script_trigger( ch );
          continue;
@@ -674,7 +699,7 @@ void mobile_update( void )
 
       if( ch != cur_char )
       {
-         bug( "%s: ch != cur_char after spec_fun", __func__ );
+         bug( "%s", "Mobile_update: ch != cur_char after spec_fun" );
          continue;
       }
 
@@ -691,9 +716,10 @@ void mobile_update( void )
          continue;
       }
 
-      if( xIS_SET( ch->in_room->room_flags, ROOM_SAFE )
+      if( IS_SET( ch->in_room->room_flags, ROOM_SAFE )
           && ( xIS_SET( ch->act, ACT_AGGRESSIVE ) || xIS_SET( ch->act, ACT_META_AGGR ) ) )
          do_emote( ch, "glares around and snarls." );
+
 
       /*
        * MOBprogram random trigger 
@@ -735,9 +761,9 @@ void mobile_update( void )
          obj_best = NULL;
          for( obj = ch->in_room->first_content; obj; obj = obj->next_content )
          {
-            if( IS_OBJ_STAT( obj, ITEM_PROTOTYPE ) && !xIS_SET( ch->act, ACT_PROTOTYPE ) )
+            if ( IS_OBJ_STAT( obj, ITEM_PROTOTYPE ) && !xIS_SET( ch->act, ACT_PROTOTYPE ) )
                continue;
-            if( CAN_WEAR( obj, ITEM_TAKE ) && obj->cost > max && !IS_OBJ_STAT( obj, ITEM_BURIED ) && !IS_OBJ_STAT( obj, ITEM_HIDDEN ) )
+            if( CAN_WEAR( obj, ITEM_TAKE ) && obj->cost > max && !IS_OBJ_STAT( obj, ITEM_BURIED ) )
             {
                obj_best = obj;
                max = obj->cost;
@@ -762,9 +788,9 @@ void mobile_update( void )
           && ( pexit = get_exit( ch->in_room, door ) ) != NULL
           && pexit->to_room
           && !IS_SET( pexit->exit_info, EX_WINDOW )
-          && ( !IS_SET( pexit->exit_info, EX_CLOSED ) || ( IS_AFFECTED( ch, AFF_PASS_DOOR ) && !IS_SET( pexit->exit_info, EX_NOPASSDOOR ) ) )
-          && !xIS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
-          && !xIS_SET( pexit->to_room->room_flags, ROOM_DEATH )
+          && !IS_SET( pexit->exit_info, EX_CLOSED )
+          && !IS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
+          && !IS_SET( pexit->to_room->room_flags, ROOM_DEATH )
           && ( !xIS_SET( ch->act, ACT_STAY_AREA ) || pexit->to_room->area == ch->in_room->area ) )
       {
          retcode = move_char( ch, pexit, 0 );
@@ -789,9 +815,8 @@ void mobile_update( void )
           && pexit->to_room
           && !IS_SET( pexit->exit_info, EX_WINDOW )
           && !IS_SET( pexit->exit_info, EX_CLOSED )
-          && !xIS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
-          && !xIS_SET( pexit->to_room->room_flags, ROOM_DEATH )
-          && ( !xIS_SET( ch->act, ACT_STAY_AREA ) || pexit->to_room->area == ch->in_room->area ) )
+          && !IS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
+          && !IS_SET( pexit->to_room->room_flags, ROOM_DEATH ) )
       {
          CHAR_DATA *rch;
          bool found;
@@ -825,55 +850,8 @@ void mobile_update( void )
             retcode = move_char( ch, pexit, 0 );
       }
    }
-   trworld_dispose( &lc );
-}
 
-/* Anything that should be updating based on time should go here - like hunger/thirst for one */
-void char_calendar_update( void )
-{
-   CHAR_DATA *ch;
-   TRV_WORLD *lc;
-
-   lc = trworld_create( TR_CHAR_WORLD_BACK );
-   for( ch = last_char; ch; ch = trvch_wnext( lc ) )
-   {
-      if( !IS_NPC( ch ) && !IS_IMMORTAL( ch ) )
-      {
-         gain_condition( ch, COND_DRUNK, -1 );
-
-         /*
-          * Newbies won't starve now - Samson 10-2-98 
-          */
-         if( ch->in_room && ch->level > 3 )
-            gain_condition( ch, COND_FULL, -1 + race_table[ch->race]->hunger_mod );
-
-         /*
-          * Newbies won't dehydrate now - Samson 10-2-98 
-          */
-         if( ch->in_room && ch->level > 3 )
-         {
-            int sector;
-
-            sector = ch->in_room->sector_type;
-
-            switch ( sector )
-            {
-               default:
-                  gain_condition( ch, COND_THIRST, -1 + race_table[ch->race]->thirst_mod );
-                  break;
-               case SECT_DESERT:
-                  gain_condition( ch, COND_THIRST, -3 + race_table[ch->race]->thirst_mod );
-                  break;
-               case SECT_UNDERWATER:
-               case SECT_OCEANFLOOR:
-                  if( number_bits( 1 ) == 0 )
-                     gain_condition( ch, COND_THIRST, -1 + race_table[ch->race]->thirst_mod );
-                  break;
-            }
-         }
-      }
-   }
-   trworld_dispose( &lc );
+   return;
 }
 
 /*
@@ -884,14 +862,23 @@ void char_update( void )
 {
    CHAR_DATA *ch;
    CHAR_DATA *ch_save;
-   TRV_WORLD *lc;
    short save_count = 0;
 
    ch_save = NULL;
-   lc = trworld_create( TR_CHAR_WORLD_BACK );
-   for( ch = last_char; ch; ch = trvch_wnext( lc ) )
+   for( ch = last_char; ch; ch = gch_prev )
    {
+      if( ch == first_char && ch->prev )
+      {
+         bug( "%s", "char_update: first_char->prev != NULL... fixed" );
+         ch->prev = NULL;
+      }
+      gch_prev = ch->prev;
       set_cur_char( ch );
+      if( gch_prev && gch_prev->next != ch )
+      {
+         bug( "%s", "char_update: ch->prev->next != ch" );
+         return;
+      }
 
       /*
        *  Do a room_prog rand check right off the bat
@@ -940,37 +927,13 @@ void char_update( void )
          update_pos( ch );
 
       /*
-       * Expire variables 
-       */
-      if( ch->variables )
-      {
-         VARIABLE_DATA *vd, *vd_next = NULL, *vd_prev = NULL;
-
-         for( vd = ch->variables; vd; vd = vd_next )
-         {
-            vd_next = vd->next;
-
-            if( vd->timer > 0 && --vd->timer == 0 )
-            {
-               if( vd == ch->variables )
-                  ch->variables = vd_next;
-               else if( vd_prev )
-                  vd_prev->next = vd_next;
-               delete_variable( vd );
-            }
-            else
-               vd_prev = vd;
-         }
-      }
-
-      /*
        * Morph timer expires 
        */
       if( ch->morph )
       {
          if( ch->morph->timer > 0 )
          {
-            --ch->morph->timer;
+            ch->morph->timer--;
             if( ch->morph->timer == 0 )
                do_unmorph_char( ch );
          }
@@ -991,12 +954,29 @@ void char_update( void )
             temp /= MAX_NUISANCE_STAGE;
             temp += ch->pcdata->nuisance->set_time;
             if( temp < current_time )
-               ++ch->pcdata->nuisance->flags;
+               ch->pcdata->nuisance->flags++;
          }
       }
 
       if( !IS_NPC( ch ) && ch->level < LEVEL_IMMORTAL )
       {
+         OBJ_DATA *obj;
+
+         if( ( obj = get_eq_char( ch, WEAR_LIGHT ) ) != NULL && obj->item_type == ITEM_LIGHT && obj->value[2] > 0 )
+         {
+            if( --obj->value[2] == 0 && ch->in_room )
+            {
+               ch->in_room->light -= obj->count;
+               if( ch->in_room->light < 0 )
+                  ch->in_room->light = 0;
+               act( AT_ACTION, "$p goes out.", ch, obj, NULL, TO_ROOM );
+               act( AT_ACTION, "$p goes out.", ch, obj, NULL, TO_CHAR );
+               if( obj->serial == cur_obj )
+                  global_objcode = rOBJ_EXPIRED;
+               extract_obj( obj );
+            }
+         }
+
          if( ++ch->timer >= 12 )
          {
             if( !IS_IDLE( ch ) )
@@ -1045,7 +1025,6 @@ void char_update( void )
                   break;
             }
          }
-
          if( ch->pcdata->condition[COND_THIRST] > 1 )
          {
             switch ( ch->position )
@@ -1073,7 +1052,6 @@ void char_update( void )
                   break;
             }
          }
-
          /*
           * Function added on suggestion from Cronel
           */
@@ -1098,6 +1076,23 @@ void char_update( void )
             gain_condition( ch, COND_THIRST, value );
             gain_condition( ch, COND_FULL, --value );
          }
+
+         if( ch->in_room )
+            switch ( ch->in_room->sector_type )
+            {
+               default:
+                  gain_condition( ch, COND_THIRST, -1 + race_table[ch->race]->thirst_mod );
+                  break;
+               case SECT_DESERT:
+                  gain_condition( ch, COND_THIRST, -3 + race_table[ch->race]->thirst_mod );
+                  break;
+               case SECT_UNDERWATER:
+               case SECT_OCEANFLOOR:
+                  if( number_bits( 1 ) == 0 )
+                     gain_condition( ch, COND_THIRST, -1 + race_table[ch->race]->thirst_mod );
+                  break;
+            }
+
       }
 
       if( !IS_NPC( ch ) && !IS_IMMORTAL( ch ) && ch->pcdata->release_date > 0 && ch->pcdata->release_date <= current_time )
@@ -1174,7 +1169,6 @@ void char_update( void )
          }
 
          if( ch->mental_state >= 30 )
-         {
             switch ( ( ch->mental_state + 5 ) / 10 )
             {
                case 3:
@@ -1211,10 +1205,8 @@ void char_update( void )
                   act( AT_ACTION, "$n is muttering and ranting in tongues...", ch, NULL, NULL, TO_ROOM );
                   break;
             }
-         }
 
          if( ch->mental_state <= -30 )
-         {
             switch ( ( abs( ch->mental_state ) + 5 ) / 10 )
             {
                case 10:
@@ -1267,15 +1259,13 @@ void char_update( void )
                      send_to_char( "You could use a rest.\r\n", ch );
                   break;
             }
-         }
-
          if( ch->timer > 24 )
             do_quit( ch, "" );
          else if( ch == ch_save && IS_SET( sysdata.save_flags, SV_AUTO ) && ++save_count < 10 ) /* save max of 10 per tick */
             save_char_obj( ch );
       }
    }
-   trworld_dispose( &lc );
+   return;
 }
 
 /*
@@ -1285,17 +1275,25 @@ void char_update( void )
 void obj_update( void )
 {
    OBJ_DATA *obj;
-   TRV_WORLD *lc;
    short AT_TEMP;
 
-   lc = trworld_create( TR_OBJ_WORLD_BACK );
-   for( obj = last_object; obj; obj = trvobj_wnext( lc ) )
+   for( obj = last_object; obj; obj = gobj_prev )
    {
       CHAR_DATA *rch;
-      const char *message;
+      char *message;
 
+      if( obj == first_object && obj->prev )
+      {
+         bug( "%s", "obj_update: first_object->prev != NULL... fixed" );
+         obj->prev = NULL;
+      }
+      gobj_prev = obj->prev;
+      if( gobj_prev && gobj_prev->next != obj )
+      {
+         bug( "%s", "obj_update: obj->prev->next != obj" );
+         return;
+      }
       set_cur_obj( obj );
-
       if( obj->carried_by )
          oprog_random_trigger( obj );
       else if( obj->in_room && obj->in_room->area->nplayer > 0 )
@@ -1303,47 +1301,6 @@ void obj_update( void )
 
       if( obj_extracted( obj ) )
          continue;
-
-      if( obj->item_type == ITEM_LIGHT )
-      {
-         CHAR_DATA *tch;
-
-         if( ( tch = obj->carried_by ) )
-         {
-            if( !IS_NPC( tch )   /* && ( tch->level < LEVEL_IMMORTAL ) */
-                && ( ( obj == get_eq_char( tch, WEAR_LIGHT ) )
-                     || ( IS_SET( obj->value[3], PIPE_LIT ) ) ) && ( obj->value[2] > 0 ) )
-               if( --obj->value[2] == 0 && tch->in_room )
-               {
-                  tch->in_room->light -= obj->count;
-                  if( tch->in_room->light < 0 )
-                     tch->in_room->light = 0;
-                  act( AT_ACTION, "$p goes out.", tch, obj, NULL, TO_ROOM );
-                  act( AT_ACTION, "$p goes out.", tch, obj, NULL, TO_CHAR );
-                  if( obj->serial == cur_obj )
-                     global_objcode = rOBJ_EXPIRED;
-                  extract_obj( obj );
-                  continue;
-               }
-         }
-         else if( obj->in_room )
-            if( IS_SET( obj->value[3], PIPE_LIT ) && ( obj->value[2] > 0 ) )
-               if( --obj->value[2] == 0 )
-               {
-                  obj->in_room->light -= obj->count;
-                  if( obj->in_room->light < 0 )
-                     obj->in_room->light = 0;
-                  if( ( tch = obj->in_room->first_person ) )
-                  {
-                     act( AT_ACTION, "$p goes out.", tch, obj, NULL, TO_ROOM );
-                     act( AT_ACTION, "$p goes out.", tch, obj, NULL, TO_CHAR );
-                  }
-                  if( obj->serial == cur_obj )
-                     global_objcode = rOBJ_EXPIRED;
-                  extract_obj( obj );
-                  continue;
-               }
-      }
 
       if( obj->item_type == ITEM_PIPE )
       {
@@ -1373,9 +1330,7 @@ void obj_update( void )
             REMOVE_BIT( obj->value[3], PIPE_HOT );
       }
 
-      /*
-       * Corpse decay (npc corpses decay at 8 times the rate of pc corpses) - Narn 
-       */
+      /* Corpse decay (npc corpses decay at 8 times the rate of pc corpses) - Narn */
       if( obj->item_type == ITEM_CORPSE_PC || obj->item_type == ITEM_CORPSE_NPC )
       {
          short timerfrac = UMAX( 1, obj->timer - 1 );
@@ -1386,7 +1341,7 @@ void obj_update( void )
          {
             char buf[MAX_STRING_LENGTH];
             char name[MAX_STRING_LENGTH];
-            const char *bufptr;
+            char *bufptr;
 
             bufptr = one_argument( obj->short_descr, name );
             bufptr = one_argument( bufptr, name );
@@ -1425,63 +1380,54 @@ void obj_update( void )
             message = "$p mysteriously vanishes.";
             AT_TEMP = AT_PLAIN;
             break;
-
          case ITEM_CONTAINER:
             message = "$p falls apart, tattered from age.";
             AT_TEMP = AT_OBJECT;
             break;
-
          case ITEM_PORTAL:
             message = "$p unravels and winks from existence.";
             remove_portal( obj );
             obj->item_type = ITEM_TRASH;  /* so extract_obj  */
             AT_TEMP = AT_MAGIC;  /* doesn't remove_portal */
             break;
-
          case ITEM_FOUNTAIN:
-         case ITEM_PUDDLE:
             message = "$p dries up.";
             AT_TEMP = AT_BLUE;
             break;
-
          case ITEM_CORPSE_NPC:
             message = "$p decays into dust and blows away.";
             AT_TEMP = AT_OBJECT;
             break;
-
          case ITEM_CORPSE_PC:
             message = "$p is sucked into a swirling vortex of colors...";
             AT_TEMP = AT_MAGIC;
             break;
-
          case ITEM_COOK:
          case ITEM_FOOD:
             message = "$p is devoured by a swarm of maggots.";
             AT_TEMP = AT_HUNGRY;
             break;
-
          case ITEM_BLOOD:
             message = "$p slowly seeps into the ground.";
             AT_TEMP = AT_BLOOD;
             break;
-
          case ITEM_BLOODSTAIN:
             message = "$p dries up into flakes and blows away.";
-            AT_TEMP = AT_ORANGE;
+            AT_TEMP = AT_BLOOD;
             break;
-
          case ITEM_SCRAPS:
             message = "$p crumble and decay into nothing.";
             AT_TEMP = AT_OBJECT;
             break;
-
          case ITEM_FIRE:
             message = "$p burns out.";
             AT_TEMP = AT_FIRE;
       }
 
       if( obj->carried_by )
+      {
          act( AT_TEMP, message, obj->carried_by, obj, NULL, TO_CHAR );
+      }
       else if( obj->in_room && ( rch = obj->in_room->first_person ) != NULL && !IS_OBJ_STAT( obj, ITEM_BURIED ) )
       {
          act( AT_TEMP, message, rch, obj, NULL, TO_ROOM );
@@ -1492,7 +1438,7 @@ void obj_update( void )
          global_objcode = rOBJ_EXPIRED;
       extract_obj( obj );
    }
-   trworld_dispose( &lc );
+   return;
 }
 
 /*
@@ -1501,8 +1447,7 @@ void obj_update( void )
  */
 void char_check( void )
 {
-   CHAR_DATA *ch;
-   TRV_WORLD *lc1;
+   CHAR_DATA *ch, *ch_next;
    OBJ_DATA *obj;
    EXIT_DATA *pexit;
    static int cnt = 0;
@@ -1513,11 +1458,10 @@ void char_check( void )
     */
    cnt = ( cnt + 1 ) % SECONDS_PER_TICK;
 
-   lc1 = trworld_create( TR_CHAR_WORLD_FORW );
-   for( ch = first_char; ch; ch = trvch_wnext( lc1 ) )
+   for( ch = first_char; ch; ch = ch_next )
    {
       set_cur_char( ch );
-
+      ch_next = ch->next;
       will_fall( ch, 0 );
 
       if( char_died( ch ) )
@@ -1533,8 +1477,7 @@ void char_check( void )
           */
          if( xIS_SET( ch->act, ACT_RUNNING ) )
          {
-            if( !xIS_SET( ch->act, ACT_SENTINEL )
-                && ch->position == POS_STANDING && !xIS_SET( ch->act, ACT_MOUNTED ) && !ch->fighting && ch->hunting )
+            if( !xIS_SET( ch->act, ACT_SENTINEL ) && !ch->fighting && ch->hunting )
             {
                WAIT_STATE( ch, 2 * PULSE_VIOLENCE );
                hunt_victim( ch );
@@ -1550,15 +1493,13 @@ void char_check( void )
             }
 
             if( !xIS_SET( ch->act, ACT_SENTINEL )
-                && ch->position == POS_STANDING
-                && !xIS_SET( ch->act, ACT_MOUNTED )
                 && !xIS_SET( ch->act, ACT_PROTOTYPE )
                 && ( door = number_bits( 4 ) ) <= 9
                 && ( pexit = get_exit( ch->in_room, door ) ) != NULL
                 && pexit->to_room
                 && !IS_SET( pexit->exit_info, EX_CLOSED )
-                && !xIS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
-                && !xIS_SET( pexit->to_room->room_flags, ROOM_DEATH )
+                && !IS_SET( pexit->to_room->room_flags, ROOM_NO_MOB )
+                && !IS_SET( pexit->to_room->room_flags, ROOM_DEATH )
                 && ( !xIS_SET( ch->act, ACT_STAY_AREA ) || pexit->to_room->area == ch->in_room->area ) )
             {
                retcode = move_char( ch, pexit, 0 );
@@ -1650,12 +1591,12 @@ void char_check( void )
           */
          if( !ch->desc )
          {
-            CHAR_DATA *wch;
-            TRV_DATA *lc2;
+            CHAR_DATA *wch, *wch_next;
 
-            lc2 = trvch_create( ch, TR_CHAR_ROOM_FORW );
-            for( wch = ch->in_room->first_person; wch; wch = trvch_next( lc2 ) )
+            for( wch = ch->in_room->first_person; wch; wch = wch_next )
             {
+               wch_next = wch->next_in_room;
+
                if( !IS_NPC( wch )
                    || wch->fighting
                    || IS_AFFECTED( wch, AFF_CHARM )
@@ -1670,15 +1611,13 @@ void char_check( void )
 
                if( ( !xIS_SET( wch->act, ACT_AGGRESSIVE )
                      && !xIS_SET( wch->act, ACT_META_AGGR ) )
-                   || xIS_SET( wch->act, ACT_MOUNTED ) || xIS_SET( wch->in_room->room_flags, ROOM_SAFE ) )
+                   || xIS_SET( wch->act, ACT_MOUNTED ) || IS_SET( wch->in_room->room_flags, ROOM_SAFE ) )
                   continue;
                global_retcode = multi_hit( wch, ch, TYPE_UNDEFINED );
             }
-            trv_dispose( &lc2 );
          }
       }
    }
-   trworld_dispose( &lc1 );
 }
 
 /*
@@ -1697,8 +1636,12 @@ void char_check( void )
 void aggr_update( void )
 {
    DESCRIPTOR_DATA *d, *dnext;
-   TRV_DATA *lc;
-   CHAR_DATA *wch, *ch, *vch, *victim;
+   CHAR_DATA *wch;
+   CHAR_DATA *ch;
+   CHAR_DATA *ch_next;
+   CHAR_DATA *vch;
+   CHAR_DATA *vch_next;
+   CHAR_DATA *victim;
    struct act_prog_data *apdtmp;
 
    /*
@@ -1716,7 +1659,7 @@ void aggr_update( void )
             if( tmp_act->obj && obj_extracted( tmp_act->obj ) )
                tmp_act->obj = NULL;
             if( tmp_act->ch && !char_died( tmp_act->ch ) )
-               mprog_wordlist_check( tmp_act->buf, wch, tmp_act->ch, tmp_act->obj, tmp_act->victim, tmp_act->target, ACT_PROG );
+               mprog_wordlist_check( tmp_act->buf, wch, tmp_act->ch, tmp_act->obj, tmp_act->vo, ACT_PROG );
             wch->mpact = tmp_act->next;
             DISPOSE( tmp_act->buf );
             DISPOSE( tmp_act );
@@ -1741,10 +1684,11 @@ void aggr_update( void )
       if( char_died( wch ) || IS_NPC( wch ) || wch->level >= LEVEL_IMMORTAL || !wch->in_room )
          continue;
 
-      lc = trvch_create( wch, TR_CHAR_ROOM_FORW );
-      for( ch = wch->in_room->first_person; ch; ch = trvch_next( lc ) )
+      for( ch = wch->in_room->first_person; ch; ch = ch_next )
       {
          int count;
+
+         ch_next = ch->next_in_room;
 
          if( !IS_NPC( ch )
              || ch->fighting
@@ -1760,7 +1704,7 @@ void aggr_update( void )
 
          if( ( !xIS_SET( ch->act, ACT_AGGRESSIVE )
                && !xIS_SET( ch->act, ACT_META_AGGR ) )
-             || xIS_SET( ch->act, ACT_MOUNTED ) || xIS_SET( ch->in_room->room_flags, ROOM_SAFE ) )
+             || xIS_SET( ch->act, ACT_MOUNTED ) || IS_SET( ch->in_room->room_flags, ROOM_SAFE ) )
             continue;
 
          /*
@@ -1772,8 +1716,10 @@ void aggr_update( void )
           */
          count = 0;
          victim = NULL;
-         for( vch = wch->in_room->first_person; vch; vch = vch->next_in_room )
+         for( vch = wch->in_room->first_person; vch; vch = vch_next )
          {
+            vch_next = vch->next_in_room;
+
             if( ( !IS_NPC( vch ) || xIS_SET( ch->act, ACT_META_AGGR )
                   || xIS_SET( vch->act, ACT_ANNOYING ) )
                 && vch->level < LEVEL_IMMORTAL
@@ -1781,13 +1727,13 @@ void aggr_update( void )
             {
                if( number_range( 0, count ) == 0 )
                   victim = vch;
-               ++count;
+               count++;
             }
          }
 
          if( !victim )
          {
-            bug( "%s: null victim. %d", __func__, count );
+            bug( "Aggr_update: null victim. %d", count );
             continue;
          }
 
@@ -1816,28 +1762,14 @@ void aggr_update( void )
                }
             }
          }
-         else if( IS_NPC( ch ) && xIS_SET( ch->attacks, ATCK_POUNCE ) )
-         {
-            if( !ch->mount && !victim->fighting )
-            {
-               check_attacker( ch, victim );
-               if( !IS_AWAKE( victim ) || number_percent(  ) + 5 < ch->level )
-               {
-                  global_retcode = multi_hit( ch, victim, gsn_pounce );
-                  continue;
-               }
-               else
-               {
-                  global_retcode = damage( ch, victim, 0, gsn_pounce );
-                  continue;
-               }
-            }
-         }
          global_retcode = multi_hit( ch, victim, TYPE_UNDEFINED );
       }
-      trv_dispose( &lc );
    }
+   return;
 }
+
+/* From interp.c */
+bool check_social( CHAR_DATA * ch, char *command, char *argument );
 
 /*
  * drunk randoms	- Tricops
@@ -1888,7 +1820,7 @@ void hallucinations( CHAR_DATA * ch )
 {
    if( ch->mental_state >= 30 && number_bits( 5 - ( ch->mental_state >= 50 ) - ( ch->mental_state >= 75 ) ) == 0 )
    {
-      const char *t;
+      char *t;
 
       switch ( number_range( 1, UMIN( 21, ( ch->mental_state + 5 ) / 5 ) ) )
       {
@@ -1976,7 +1908,7 @@ void tele_update( void )
       {
          if( tele->room->first_person )
          {
-            if( xIS_SET( tele->room->room_flags, ROOM_TELESHOWDESC ) )
+            if( IS_SET( tele->room->room_flags, ROOM_TELESHOWDESC ) )
                teleport( tele->room->first_person, tele->room->tele_vnum, TELE_SHOWDESC | TELE_TRANSALL );
             else
                teleport( tele->room->first_person, tele->room->tele_vnum, TELE_TRANSALL );
@@ -2022,8 +1954,6 @@ void update_handler( void )
    static int pulse_violence;
    static int pulse_point;
    static int pulse_second;
-   static int pulse_time;
-   static int pulse_houseauc;
    struct timeval sttime;
    struct timeval etime;
 
@@ -2032,12 +1962,6 @@ void update_handler( void )
       set_char_color( AT_PLAIN, timechar );
       send_to_char( "Starting update timer.\r\n", timechar );
       gettimeofday( &sttime, NULL );
-   }
-
-   if( --pulse_houseauc  <= 0 )
-   {
-      pulse_houseauc = 1800 * PULSE_PER_SECOND;
-      homebuy_update();
    }
 
    if( --pulse_area <= 0 )
@@ -2058,20 +1982,13 @@ void update_handler( void )
       violence_update(  );
    }
 
-   if( --pulse_time <= 0 )
-   {
-      pulse_time = sysdata.pulsecalendar;
-      char_calendar_update(  );
-   }
-
    if( --pulse_point <= 0 )
    {
       pulse_point = number_range( ( int )( PULSE_TICK * 0.75 ), ( int )( PULSE_TICK * 1.25 ) );
 
       auth_update(  );  /* Gorog */
-      time_update(  );  /* If looking for slower passing time, move this to just above char_calendar_update(  ); */
-      UpdateWeather(  ); /* New Weather Updater -Kayle */
-      hint_update(  );
+      time_update(  );
+      weather_update(  );
       char_update(  );
       obj_update(  );
       clear_vrooms(  ); /* remove virtual rooms */
@@ -2091,7 +2008,6 @@ void update_handler( void )
       auction_update(  );
    }
 
-   mpsleep_update(  );  /* Check for sleeping mud progs -rkb */
    tele_update(  );
    aggr_update(  );
    obj_act_update(  );
@@ -2104,11 +2020,13 @@ void update_handler( void )
       set_char_color( AT_PLAIN, timechar );
       send_to_char( "Update timing complete.\r\n", timechar );
       subtract_times( &etime, &sttime );
-      ch_printf( timechar, "Timing took %ld.%06ld seconds.\r\n", ( time_t ) etime.tv_sec, ( time_t ) etime.tv_usec );
+      ch_printf( timechar, "Timing took %ld.%06ld seconds.\r\n", (time_t)etime.tv_sec, (time_t)etime.tv_usec );
       timechar = NULL;
    }
    tail_chain(  );
+   return;
 }
+
 
 void remove_portal( OBJ_DATA * portal )
 {
@@ -2150,11 +2068,13 @@ void remove_portal( OBJ_DATA * portal )
       bug( "%s", "remove_portal: toRoom is NULL" );
 
    extract_exit( fromRoom, pexit );
+
+   return;
 }
 
 void reboot_check( time_t reset )
 {
-   static const char *tmsg[] = { "You feel the ground shake as the end comes near!",
+   static char *tmsg[] = { "You feel the ground shake as the end comes near!",
       "Lightning crackles in the sky above!",
       "Crashes of thunder sound across the land!",
       "The sky has suddenly turned midnight black.",
@@ -2215,6 +2135,7 @@ void reboot_check( time_t reset )
       --trun;
       return;
    }
+   return;
 }
 
 /* the auction update*/
@@ -2302,20 +2223,23 @@ void auction_update( void )
          }
          else  /* not sold */
          {
-            snprintf( buf, MAX_STRING_LENGTH, "No bids received for %s - removed from auction.", auction->item->short_descr );
+            snprintf( buf, MAX_STRING_LENGTH, "No bids received for %s - removed from auction.\r\n",
+                      auction->item->short_descr );
             talk_auction( buf );
-            act( AT_ACTION, "The auctioneer appears before you to return $p to you.", auction->seller, auction->item, NULL, TO_CHAR );
-            act( AT_ACTION, "The auctioneer appears before $n to return $p to $m.", auction->seller, auction->item, NULL, TO_ROOM );
-
+            act( AT_ACTION, "The auctioneer appears before you to return $p to you.",
+                 auction->seller, auction->item, NULL, TO_CHAR );
+            act( AT_ACTION, "The auctioneer appears before $n to return $p to $m.",
+                 auction->seller, auction->item, NULL, TO_ROOM );
             if( ( auction->seller->carry_weight + get_obj_weight( auction->item ) ) > can_carry_w( auction->seller ) )
             {
-               act( AT_PLAIN, "You drop $p as it is just too much to carry with everything else you're carrying.", auction->seller, auction->item, NULL, TO_CHAR );
-               act( AT_PLAIN, "$n drops $p as it is too much extra weight for $m with everything else.", auction->seller, auction->item, NULL, TO_ROOM );
+               act( AT_PLAIN, "You drop $p as it is just too much to carry"
+                    " with everything else you're carrying.", auction->seller, auction->item, NULL, TO_CHAR );
+               act( AT_PLAIN, "$n drops $p as it is too much extra weight"
+                    " for $m with everything else.", auction->seller, auction->item, NULL, TO_ROOM );
                obj_to_room( auction->item, auction->seller->in_room );
             }
             else
                obj_to_char( auction->item, auction->seller );
-
             tax = ( int )( auction->item->cost * 0.05 );
             boost_economy( auction->seller->in_room->area, tax );
             ch_printf( auction->seller, "The auctioneer charges you an auction fee of %s.\r\n", num_punct( tax ) );
@@ -2339,175 +2263,549 @@ void subtract_times( struct timeval *etime, struct timeval *sttime )
       etime->tv_usec += 1000000;
       etime->tv_sec--;
    }
+   return;
+}
+
+/*
+ * Function to update weather vectors according to climate
+ * settings, random effects, and neighboring areas.
+ * Last modified: July 18, 1997
+ * - Fireblade
+ */
+void adjust_vectors( WEATHER_DATA * weather )
+{
+   NEIGHBOR_DATA *neigh;
+   double dT, dP, dW;
+
+   if( !weather )
+   {
+      bug( "%s: NULL weather data.", __FUNCTION__ );
+      return;
+   }
+
+   dT = 0;
+   dP = 0;
+   dW = 0;
+
+   /*
+    * Add in random effects 
+    */
+   dT += number_range( -rand_factor, rand_factor );
+   dP += number_range( -rand_factor, rand_factor );
+   dW += number_range( -rand_factor, rand_factor );
+
+   /*
+    * Add in climate effects
+    */
+   dT += climate_factor * ( ( ( weather->climate_temp - 2 ) * weath_unit ) - ( weather->temp ) ) / weath_unit;
+   dP += climate_factor * ( ( ( weather->climate_precip - 2 ) * weath_unit ) - ( weather->precip ) ) / weath_unit;
+   dW += climate_factor * ( ( ( weather->climate_wind - 2 ) * weath_unit ) - ( weather->wind ) ) / weath_unit;
+
+   /*
+    * Add in effects from neighboring areas 
+    */
+   for( neigh = weather->first_neighbor; neigh; neigh = neigh->next )
+   {
+      /*
+       * see if we have the area cache'd already 
+       */
+      if( !neigh->address )
+      {
+         /*
+          * try and find address for area 
+          */
+         neigh->address = get_area( neigh->name );
+
+         /*
+          * if couldn't find area ditch the neigh 
+          */
+         if( !neigh->address )
+         {
+            NEIGHBOR_DATA *temp;
+            bug( "%s", "adjust_weather: invalid area name." );
+            temp = neigh->prev;
+            UNLINK( neigh, weather->first_neighbor, weather->last_neighbor, next, prev );
+            STRFREE( neigh->name );
+            DISPOSE( neigh );
+            neigh = temp;
+            continue;
+         }
+      }
+
+      dT += ( neigh->address->weather->temp - weather->temp ) / neigh_factor;
+      dP += ( neigh->address->weather->precip - weather->precip ) / neigh_factor;
+      dW += ( neigh->address->weather->wind - weather->wind ) / neigh_factor;
+   }
+
+   /*
+    * now apply the effects to the vectors 
+    */
+   weather->temp_vector += ( int )dT;
+   weather->precip_vector += ( int )dP;
+   weather->wind_vector += ( int )dW;
+
+   /*
+    * Make sure they are within the right range 
+    */
+   weather->temp_vector = URANGE( -max_vector, weather->temp_vector, max_vector );
+   weather->precip_vector = URANGE( -max_vector, weather->precip_vector, max_vector );
+   weather->wind_vector = URANGE( -max_vector, weather->wind_vector, max_vector );
+
+   return;
+}
+
+/*
+ * function updates weather for each area
+ * Last Modified: July 31, 1997
+ * Fireblade
+ */
+void weather_update(  )
+{
+   AREA_DATA *pArea;
+   DESCRIPTOR_DATA *d;
+   int limit;
+
+   limit = 3 * weath_unit;
+
+   for( pArea = first_area; pArea; pArea = ( pArea == last_area ) ? first_build : pArea->next )
+   {
+      /*
+       * Apply vectors to fields 
+       */
+      pArea->weather->temp += pArea->weather->temp_vector;
+      pArea->weather->precip += pArea->weather->precip_vector;
+      pArea->weather->wind += pArea->weather->wind_vector;
+
+      /*
+       * Make sure they are within the proper range 
+       */
+      pArea->weather->temp = URANGE( -limit, pArea->weather->temp, limit );
+      pArea->weather->precip = URANGE( -limit, pArea->weather->precip, limit );
+      pArea->weather->wind = URANGE( -limit, pArea->weather->wind, limit );
+
+      /*
+       * get an appropriate echo for the area 
+       */
+      get_weather_echo( pArea->weather );
+   }
+
+   for( pArea = first_area; pArea; pArea = ( pArea == last_area ) ? first_build : pArea->next )
+   {
+      adjust_vectors( pArea->weather );
+   }
+
+   /*
+    * display the echo strings to the appropriate players 
+    */
+   for( d = first_descriptor; d; d = d->next )
+   {
+      WEATHER_DATA *weath;
+
+      if( d->connected == CON_PLAYING &&
+          IS_OUTSIDE( d->character ) && !NO_WEATHER_SECT( d->character->in_room->sector_type ) && IS_AWAKE( d->character ) )
+      {
+         weath = d->character->in_room->area->weather;
+         if( !weath->echo )
+            continue;
+         set_char_color( weath->echo_color, d->character );
+         send_to_char( weath->echo, d->character );
+      }
+   }
+   return;
+}
+
+/*
+ * get weather echo messages according to area weather...
+ * stores echo message in weath_data.... must be called before
+ * the vectors are adjusted
+ * Last Modified: August 10, 1997
+ * Fireblade
+ */
+void get_weather_echo( WEATHER_DATA * weath )
+{
+   int n;
+   int temp, precip, wind;
+   int dT, dP, dW;
+   int tindex, pindex, windex;
+
+   /*
+    * set echo to be nothing 
+    */
+   weath->echo = NULL;
+   weath->echo_color = AT_GREY;
+
+   /*
+    * get the random number 
+    */
+   n = number_bits( 2 );
+
+   /*
+    * variables for convenience 
+    */
+   temp = weath->temp;
+   precip = weath->precip;
+   wind = weath->wind;
+
+   dT = weath->temp_vector;
+   dP = weath->precip_vector;
+   dW = weath->wind_vector;
+
+   tindex = ( temp + 3 * weath_unit - 1 ) / weath_unit;
+   pindex = ( precip + 3 * weath_unit - 1 ) / weath_unit;
+   windex = ( wind + 3 * weath_unit - 1 ) / weath_unit;
+
+   /*
+    * get the echo string... mainly based on precip 
+    */
+   switch ( pindex )
+   {
+      case 0:
+         if( precip - dP > -2 * weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The clouds disappear.\r\n",
+               "The clouds disappear.\r\n",
+               "The sky begins to break through the clouds.\r\n",
+               "The clouds are slowly evaporating.\r\n"
+            };
+
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_WHITE;
+         }
+         break;
+
+      case 1:
+         if( precip - dP <= -2 * weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The sky is getting cloudy.\r\n",
+               "The sky is getting cloudy.\r\n",
+               "Light clouds cast a haze over the sky.\r\n",
+               "Billows of clouds spread through the sky.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_GREY;
+         }
+         break;
+
+      case 2:
+         if( precip - dP > 0 )
+         {
+            if( tindex > 1 )
+            {
+               char *echo_strings[4] = {
+                  "The rain stops.\r\n",
+                  "The rain stops.\r\n",
+                  "The rainstorm tapers off.\r\n",
+                  "The rain's intensity breaks.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_CYAN;
+            }
+            else
+            {
+               char *echo_strings[4] = {
+                  "The snow stops.\r\n",
+                  "The snow stops.\r\n",
+                  "The snow showers taper off.\r\n",
+                  "The snow flakes disappear from the sky.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_WHITE;
+            }
+         }
+         break;
+
+      case 3:
+         if( precip - dP <= 0 )
+         {
+            if( tindex > 1 )
+            {
+               char *echo_strings[4] = {
+                  "It starts to rain.\r\n",
+                  "It starts to rain.\r\n",
+                  "A droplet of rain falls upon you.\r\n",
+                  "The rain begins to patter.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_CYAN;
+            }
+            else
+            {
+               char *echo_strings[4] = {
+                  "It starts to snow.\r\n",
+                  "It starts to snow.\r\n",
+                  "Crystal flakes begin to fall from the " "sky.\r\n",
+                  "Snow flakes drift down from the clouds.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_WHITE;
+            }
+         }
+         else if( tindex < 2 && temp - dT > -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The temperature drops and the rain becomes a light snow.\r\n",
+               "The temperature drops and the rain becomes a light snow.\r\n",
+               "Flurries form as the rain freezes.\r\n",
+               "Large snow flakes begin to fall with the rain.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_WHITE;
+         }
+         else if( tindex > 1 && temp - dT <= -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The snow flurries are gradually replaced by pockets of rain.\r\n",
+               "The snow flurries are gradually replaced by pockets of rain.\r\n",
+               "The falling snow turns to a cold drizzle.\r\n",
+               "The snow turns to rain as the air warms.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_CYAN;
+         }
+         break;
+
+      case 4:
+         if( precip - dP > 2 * weath_unit )
+         {
+            if( tindex > 1 )
+            {
+               char *echo_strings[4] = {
+                  "The lightning has stopped.\r\n",
+                  "The lightning has stopped.\r\n",
+                  "The sky settles, and the thunder surrenders.\r\n",
+                  "The lightning bursts fade as the storm weakens.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_GREY;
+            }
+         }
+         else if( tindex < 2 && temp - dT > -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The cold rain turns to snow.\r\n",
+               "The cold rain turns to snow.\r\n",
+               "Snow flakes begin to fall amidst the rain.\r\n",
+               "The driving rain begins to freeze.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_WHITE;
+         }
+         else if( tindex > 1 && temp - dT <= -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The snow becomes a freezing rain.\r\n",
+               "The snow becomes a freezing rain.\r\n",
+               "A cold rain beats down on you as the snow begins to melt.\r\n",
+               "The snow is slowly replaced by a heavy rain.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_CYAN;
+         }
+         break;
+
+      case 5:
+         if( precip - dP <= 2 * weath_unit )
+         {
+            if( tindex > 1 )
+            {
+               char *echo_strings[4] = {
+                  "Lightning flashes in the sky.\r\n",
+                  "Lightning flashes in the sky.\r\n",
+                  "A flash of lightning splits the sky.\r\n",
+                  "The sky flashes, and the ground trembles with thunder.\r\n"
+               };
+               weath->echo = echo_strings[n];
+               weath->echo_color = AT_YELLOW;
+            }
+         }
+         else if( tindex > 1 && temp - dT <= -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The sky rumbles with thunder as the snow changes to rain.\r\n",
+               "The sky rumbles with thunder as the snow changes to rain.\r\n",
+               "The falling turns to freezing rain amidst flashes of lightning.\r\n",
+               "The falling snow begins to melt as thunder crashes overhead.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_WHITE;
+         }
+         else if( tindex < 2 && temp - dT > -weath_unit )
+         {
+            char *echo_strings[4] = {
+               "The lightning stops as the rainstorm becomes a blinding blizzard.\r\n",
+               "The lightning stops as the rainstorm becomes a blinding blizzard.\r\n",
+               "The thunder dies off as the pounding rain turns to heavy snow.\r\n",
+               "The cold rain turns to snow and the lightning stops.\r\n"
+            };
+            weath->echo = echo_strings[n];
+            weath->echo_color = AT_CYAN;
+         }
+         break;
+
+      default:
+         bug( "%s: invalid precip index", __FUNCTION__ );
+         weath->precip = 0;
+         break;
+   }
+
+   return;
+}
+
+/*
+ * get echo messages according to time changes...
+ * some echoes depend upon the weather so an echo must be
+ * found for each area
+ * Last Modified: August 10, 1997
+ * Fireblade
+ */
+void get_time_echo( WEATHER_DATA * weath )
+{
+   int n;
+   int pindex;
+
+   n = number_bits( 2 );
+   pindex = ( weath->precip + 3 * weath_unit - 1 ) / weath_unit;
+   weath->echo = NULL;
+   weath->echo_color = AT_GREY;
+
+   switch ( time_info.hour )
+   {
+      case 5:
+      {
+         char *echo_strings[4] = {
+            "The day has begun.\r\n",
+            "The day has begun.\r\n",
+            "The sky slowly begins to glow.\r\n",
+            "The sun slowly embarks upon a new day.\r\n"
+         };
+         time_info.sunlight = SUN_RISE;
+         weath->echo = echo_strings[n];
+         weath->echo_color = AT_YELLOW;
+         break;
+      }
+      case 6:
+      {
+         char *echo_strings[4] = {
+            "The sun rises in the east.\r\n",
+            "The sun rises in the east.\r\n",
+            "The hazy sun rises over the horizon.\r\n",
+            "Day breaks as the sun lifts into the sky.\r\n"
+         };
+         time_info.sunlight = SUN_LIGHT;
+         weath->echo = echo_strings[n];
+         weath->echo_color = AT_ORANGE;
+         break;
+      }
+      case 12:
+      {
+         if( pindex > 0 )
+         {
+            weath->echo = "It's noon.\r\n";
+         }
+         else
+         {
+            char *echo_strings[2] = {
+               "The intensity of the sun heralds the noon hour.\r\n",
+               "The sun's bright rays beat down upon your shoulders.\r\n"
+            };
+            weath->echo = echo_strings[n % 2];
+         }
+         time_info.sunlight = SUN_LIGHT;
+         weath->echo_color = AT_WHITE;
+         break;
+      }
+      case 19:
+      {
+         char *echo_strings[4] = {
+            "The sun slowly disappears in the west.\r\n",
+            "The reddish sun sets past the horizon.\r\n",
+            "The sky turns a reddish orange as the sun ends its journey.\r\n",
+            "The sun's radiance dims as it sinks in the sky.\r\n"
+         };
+         time_info.sunlight = SUN_SET;
+         weath->echo = echo_strings[n];
+         weath->echo_color = AT_RED;
+         break;
+      }
+      case 20:
+      {
+         if( pindex > 0 )
+         {
+            char *echo_strings[2] = {
+               "The night begins.\r\n",
+               "Twilight descends around you.\r\n"
+            };
+            weath->echo = echo_strings[n % 2];
+         }
+         else
+         {
+            char *echo_strings[2] = {
+               "The moon's gentle glow diffuses through the night sky.\r\n",
+               "The night sky gleams with glittering starlight.\r\n"
+            };
+            weath->echo = echo_strings[n % 2];
+         }
+         time_info.sunlight = SUN_DARK;
+         weath->echo_color = AT_DBLUE;
+         break;
+      }
+   }
+
+   return;
 }
 
 /*
  * update the time
  */
-void time_update( void )
+void time_update(  )
 {
+   AREA_DATA *pArea;
    DESCRIPTOR_DATA *d;
-   int n;
-   const char *echo; /* echo string */
-   int echo_color;   /* color for the echo */
+   WEATHER_DATA *weath;
 
-   n = number_bits( 2 );
-   echo = NULL;
-   echo_color = AT_GREY;
-
-   ++time_info.hour; 
-
-   if( time_info.hour == sysdata.hourdaybegin || time_info.hour == sysdata.hoursunrise
-       || time_info.hour == sysdata.hournoon || time_info.hour == sysdata.hoursunset
-       || time_info.hour == sysdata.hournightbegin )
+   switch ( ++time_info.hour )
    {
-      for( d = first_descriptor; d; d = d->next )
-      {
-         if( d->connected == CON_PLAYING && IS_OUTSIDE( d->character ) && !NO_WEATHER_SECT( d->character->in_room->sector_type ) && IS_AWAKE( d->character ) )
+      case 5:
+      case 6:
+      case 12:
+      case 19:
+      case 20:
+         for( pArea = first_area; pArea; pArea = ( pArea == last_area ) ? first_build : pArea->next )
          {
-            struct WeatherCell *cell = getWeatherCell( d->character->in_room->area );
-
-            switch( time_info.hour )
-            {
-               case 6:
-               {
-                  const char *echo_strings[4] = {
-                     "The day has begun.\r\n",
-                     "The day has begun.\r\n",
-                     "The sky slowly begins to glow.\r\n",
-                     "The sun slowly embarks upon a new day.\r\n"
-                  };
-                  time_info.sunlight = SUN_RISE;
-                  echo = echo_strings[n];
-                  echo_color = AT_YELLOW;
-                  break;
-               }
-
-               case 7:
-               {
-                  const char *echo_strings[4] = {
-                     "The sun rises in the east.\r\n",
-                     "The sun rises in the east.\r\n",
-                     "The hazy sun rises over the horizon.\r\n",
-                     "Day breaks as the sun lifts into the sky.\r\n"
-                  };
-                  time_info.sunlight = SUN_LIGHT;
-                  echo = echo_strings[n];
-                  echo_color = AT_ORANGE;
-                  break;
-               }
-
-               case 12:
-               {
-                  if( getCloudCover( cell ) > 21 )
-                  {
-                     echo = "It's noon.\r\n";
-                  }
-                  else
-                  {
-                     const char *echo_strings[2] = {
-                        "The intensity of the sun heralds the noon hour.\r\n",
-                        "The sun's bright rays beat down upon your shoulders.\r\n"
-                     };
-
-                     echo = echo_strings[n % 2];
-                  }
-                  time_info.sunlight = SUN_LIGHT;
-                  echo_color = AT_WHITE;
-                  break;
-               }
-
-               case 18:
-               {
-                  const char *echo_strings[4] = {
-                     "The sun slowly disappears in the west.\r\n",
-                     "The reddish sun sets past the horizon.\r\n",
-                     "The sky turns a reddish orange as the sun ends its journey.\r\n",
-                     "The sun's radiance dims as it sinks in the sky.\r\n"
-                  };
-                  time_info.sunlight = SUN_SET;
-                  echo = echo_strings[n];
-                  echo_color = AT_RED;
-                  break;
-               }
-
-               case 19:
-               {
-                  if( getCloudCover( cell ) > 21 )
-                  {
-                     const char *echo_strings[2] = {
-                        "The night begins.\r\n",
-                        "Twilight descends around you.\r\n"
-                     };
-
-                     echo = echo_strings[n % 2];
-                  }
-                  else
-                  {
-                     const char *echo_strings[2] = {
-                        "The moon's gentle glow diffuses through the night sky.\r\n",
-                        "The night sky gleams with glittering starlight.\r\n"
-                     };
-
-                     echo = echo_strings[n % 2];
-                  }
-                  time_info.sunlight = SUN_DARK;
-                  echo_color = AT_DBLUE;
-                  break;
-               }
-            }
-
-            if( !echo )
-               continue;
-            set_char_color( echo_color, d->character );
-            send_to_char( echo, d->character );
+            get_time_echo( pArea->weather );
          }
-      }
+
+         for( d = first_descriptor; d; d = d->next )
+         {
+            if( d->connected == CON_PLAYING && IS_OUTSIDE( d->character ) && IS_AWAKE( d->character ) )
+            {
+               weath = d->character->in_room->area->weather;
+               if( !weath->echo )
+                  continue;
+               set_char_color( weath->echo_color, d->character );
+               send_to_char( weath->echo, d->character );
+            }
+         }
+         break;
+      case 24:
+         time_info.hour = 0;
+         time_info.day++;
+         break;
    }
 
-   if( time_info.hour == sysdata.hourmidnight )
-   {
-      time_info.hour = 0;
-      time_info.day++;
-      RandomizeCells(  );
-   }
-
-   if( time_info.day >= sysdata.dayspermonth )
+   if( time_info.day >= 30 )
    {
       time_info.day = 0;
       time_info.month++;
    }
 
-   if( time_info.month >= sysdata.monthsperyear )
+   if( time_info.month >= 17 )
    {
       time_info.month = 0;
       time_info.year++;
    }
-   calc_season(  );  /* Samson 5-6-99 */
-   /*
-    * Save game world time - Samson 1-21-99 
-    */
-   save_timedata(  );
-}
 
-void hint_update(  )
-{
-   DESCRIPTOR_DATA *d;
-
-   if( time_info.hour % 1 == 0 )
-   {
-      for( d = first_descriptor; d; d = d->next )
-      {
-         if( d->connected == CON_PLAYING && IS_AWAKE( d->character ) && d->character->pcdata )
-         {
-            if( IS_SET( d->character->pcdata->flags, PCFLAG_HINTS ) && number_bits( 1 ) == 0 )
-            {
-               if( d->character->level > LEVEL_AVATAR )
-                  ch_printf_color( d->character, "&p( &wHINT&p ):  &P%s\r\n", get_hint( LEVEL_AVATAR ) );
-               else
-                  ch_printf_color( d->character, "&p( &wHINT&p ):  &P%s\r\n", get_hint( d->character->level ) );
-            }
-         }
-      }
-   }
+   return;
 }

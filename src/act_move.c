@@ -1,18 +1,18 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                            Player movement module                        *
+ *			   Player movement module			    *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -20,13 +20,11 @@
 #include <ctype.h>
 #include "mud.h"
 
-ROOM_INDEX_DATA *vroom_hash[64];
-
 const short movement_loss[SECT_MAX] = {
    1, 2, 2, 3, 4, 6, 4, 1, 6, 10, 6, 5, 7, 4
 };
 
-const char *const dir_name[] = {
+char *const dir_name[] = {
    "north", "east", "south", "west", "up", "down",
    "northeast", "northwest", "southeast", "southwest", "somewhere"
 };
@@ -36,16 +34,22 @@ const int trap_door[] = {
    TRAP_NE, TRAP_NW, TRAP_SE, TRAP_SW
 };
 
+
 const short rev_dir[] = {
    2, 3, 0, 1, 5, 4, 9, 8, 7, 6, 10
 };
 
+
+ROOM_INDEX_DATA *vroom_hash[64];
+
+
 /*
  * Local functions.
  */
-OBJ_DATA *has_key( CHAR_DATA * ch, int key );
+OBJ_DATA *has_key args( ( CHAR_DATA * ch, int key ) );
 
-const char *const sect_names[SECT_MAX][2] = {
+
+char *const sect_names[SECT_MAX][2] = {
    {"In a room", "inside"}, {"In a city", "cities"},
    {"In a field", "fields"}, {"In a forest", "forests"},
    {"hill", "hills"}, {"On a mountain", "mountains"},
@@ -55,11 +59,12 @@ const char *const sect_names[SECT_MAX][2] = {
    {"ocean floor", "ocean floor"}, {"underground", "underground"}
 };
 
+
 const int sent_total[SECT_MAX] = {
    3, 5, 4, 4, 1, 1, 1, 1, 1, 2, 2, 25, 1, 1
 };
 
-const char *const room_sents[SECT_MAX][25] = {
+char *const room_sents[SECT_MAX][25] = {
    {
     "rough hewn walls of granite with the occasional spider crawling around",
     "signs of a recent battle from the bloodstains on the floor",
@@ -217,7 +222,7 @@ void decorate_room( ROOM_INDEX_DATA * room )
    int iRand, len;
    int previous[8];
    int sector = room->sector_type;
-   const char *pre = "You notice ", *post = ".";
+   char *pre = "You notice ", *post = ".";
 
    if( room->name )
       STRFREE( room->name );
@@ -254,7 +259,7 @@ void decorate_room( ROOM_INDEX_DATA * room )
          len = strlen( buf );
          if( len == 0 )
          {
-            switch ( number_range( 1, ( 2 * ( iRand == nRand - 1 ) ) ? 1 : 2 ) )
+            switch ( number_range( 1, 2 * ( iRand == nRand - 1 ) ? 1 : 2 ) )
             {
                case 1:
                   pre = "You notice ";
@@ -374,7 +379,7 @@ void clear_vrooms(  )
    }
 }
 
-const char *rev_exit( short vdir )
+char *rev_exit( short vdir )
 {
    switch ( vdir )
    {
@@ -462,6 +467,7 @@ EXIT_DATA *get_exit_num( ROOM_INDEX_DATA * room, short count )
    return NULL;
 }
 
+
 /*
  * Modify movement due to encumbrance				-Thoric
  */
@@ -487,12 +493,13 @@ short encumbrance( CHAR_DATA * ch, short move )
       return move;
 }
 
+
 /*
  * Check to see if a character can fall down, checks for looping   -Thoric
  */
 bool will_fall( CHAR_DATA * ch, int fall )
 {
-   if( xIS_SET( ch->in_room->room_flags, ROOM_NOFLOOR )
+   if( IS_SET( ch->in_room->room_flags, ROOM_NOFLOOR )
        && CAN_GO( ch, DIR_DOWN )
        && ( !IS_AFFECTED( ch, AFF_FLYING ) || ( ch->mount && !IS_AFFECTED( ch->mount, AFF_FLYING ) ) ) )
    {
@@ -568,10 +575,6 @@ ROOM_INDEX_DATA *generate_exit( ROOM_INDEX_DATA * in_room, EXIT_DATA ** pexit )
    if( !found )
    {
       CREATE( room, ROOM_INDEX_DATA, 1 );
-      room->first_affect = NULL;
-      room->last_affect = NULL;
-      room->first_permaffect = NULL;
-      room->last_permaffect = NULL;
       room->area = in_room->area;
       room->vnum = serial;
       room->tele_vnum = roomnum;
@@ -617,8 +620,8 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
    ROOM_INDEX_DATA *from_room;
    OBJ_DATA *boat;
    char buf[MAX_STRING_LENGTH];
-   const char *txt;
-   const char *dtxt;
+   char *txt;
+   char *dtxt;
    ch_ret retcode;
    short door, distance;
    bool drunk = FALSE;
@@ -723,13 +726,13 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
       return rNONE;
    }
 
-   if( IS_SET( pexit->exit_info, EX_NOMOB ) && IS_NPC( ch ) && !xIS_SET( ch->act, ACT_PET ) )
+   if( IS_SET( pexit->exit_info, EX_NOMOB ) && IS_NPC( ch ) )
    {
       act( AT_PLAIN, "Mobs can't enter there.", ch, NULL, NULL, TO_CHAR );
       return rNONE;
    }
 
-   if( xIS_SET( to_room->room_flags, ROOM_NO_MOB ) && IS_NPC( ch ) )
+   if( IS_SET( to_room->room_flags, ROOM_NO_MOB ) && IS_NPC( ch ) )
    {
       act( AT_PLAIN, "Mobs can't enter there.", ch, NULL, NULL, TO_CHAR );
       return rNONE;
@@ -772,12 +775,6 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
       return rNONE;
    }
 
-   if( IS_NPC(ch) && xIS_SET( to_room->room_flags, ROOM_NO_MOB ) && !xIS_SET( ch->act, ACT_PET ) )
-   {
-      act( AT_PLAIN, "Mobs can't enter there.", ch, NULL, NULL, TO_CHAR );
-      return rNONE;
-   }
-
    if( room_is_private( to_room ) )
    {
       send_to_char( "That room is private right now.\r\n", ch );
@@ -798,36 +795,53 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
          switch ( to_room->area->low_hard_range - ch->level )
          {
             case 1:
-               send_to_char( "A voice in your mind says, 'You are nearly ready to go that way...'\r\n", ch );
+               send_to_char( "A voice in your mind says, 'You are nearly ready to go that way...'", ch );
                break;
             case 2:
-               send_to_char( "A voice in your mind says, 'Soon you shall be ready to travel down this path... soon.'\r\n", ch );
+               send_to_char( "A voice in your mind says, 'Soon you shall be ready to travel down this path... soon.'", ch );
                break;
             case 3:
-               send_to_char( "A voice in your mind says, 'You are not ready to go down that path... yet.'\r\n", ch );
+               send_to_char( "A voice in your mind says, 'You are not ready to go down that path... yet.'.\r\n", ch );
                break;
             default:
-               send_to_char( "A voice in your mind says, 'You are not ready to go down that path.'\r\n", ch );
+               send_to_char( "A voice in your mind says, 'You are not ready to go down that path.'.\r\n", ch );
          }
          return rNONE;
       }
       else if( ch->level > to_room->area->hi_hard_range )
       {
          set_char_color( AT_TELL, ch );
-         send_to_char( "A voice in your mind says, 'There is nothing more for you down that path.'\r\n", ch );
+         send_to_char( "A voice in your mind says, 'There is nothing more for you down that path.'", ch );
          return rNONE;
       }
    }
 
    if( !fall && !IS_NPC( ch ) )
    {
-      int move;
-
       /*
-       * Prevent deadlies from entering a nopkill-flagged area from a 
-       * non-flagged area, but allow them to move around if already
-       * inside a nopkill area. - Blodkai
+       * int iClass;
        */
+      int move;
+/* Pretty sure we don't need to check for guilds anymore now that we have
+   the new dh. -- Narn
+*/
+/*
+	for ( iClass = 0; iClass < MAX_CLASS; iClass++ )
+	{
+	    if ( iClass != ch->class
+	    &&   to_room->vnum == class_table[iClass]->guild )
+	    {
+		send_to_char( "You aren't allowed in there.\r\n", ch );
+		return rNONE;
+	    }
+	}
+*/
+
+/* Prevent deadlies from entering a nopkill-flagged area from a 
+   non-flagged area, but allow them to move around if already
+   inside a nopkill area. - Blodkai
+*/
+
       if( IS_SET( to_room->area->flags, AFLAG_NOPKILL )
           && !IS_SET( ch->in_room->area->flags, AFLAG_NOPKILL ) && ( IS_PKILL( ch ) && !IS_IMMORTAL( ch ) ) )
       {
@@ -1158,7 +1172,7 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
    /*
     * Make sure everyone sees the room description of death traps. 
     */
-   if( xIS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
+   if( IS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
    {
       if( xIS_SET( ch->act, PLR_BRIEF ) )
          brief = TRUE;
@@ -1172,14 +1186,14 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
    /*
     * Put good-old EQ-munching death traps back in!     -Thoric
     */
-   if( xIS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
+   if( IS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
    {
       act( AT_DEAD, "$n falls prey to a terrible death!", ch, NULL, NULL, TO_ROOM );
       set_char_color( AT_DEAD, ch );
       send_to_char( "Oopsie... you're dead!\r\n", ch );
       snprintf( buf, MAX_STRING_LENGTH, "%s hit a DEATH TRAP in room %d!", ch->name, ch->in_room->vnum );
       log_string( buf );
-      to_channel( buf, CHANNEL_DEATH, "Death", LEVEL_IMMORTAL );
+      to_channel( buf, CHANNEL_MONITOR, "Monitor", LEVEL_IMMORTAL );
       if( IS_NPC( ch ) )
          extract_char( ch, TRUE );
       else
@@ -1211,8 +1225,8 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
          {
             if( !get_exit( from_room, door ) )
             {
-               act( AT_ACTION, "The entrance closes behind $N, preventing you from following!", fch, NULL, ch, TO_CHAR );
-               continue;
+              act( AT_ACTION, "The entrance closes behind $N, preventing you from following!", fch, NULL, ch, TO_CHAR );
+              continue;
             }
             act( AT_ACTION, "You follow $N.", fch, NULL, ch, TO_CHAR );
             move_char( fch, pexit, 0 );
@@ -1262,67 +1276,67 @@ ch_ret move_char( CHAR_DATA * ch, EXIT_DATA * pexit, int fall )
    return retcode;
 }
 
-void do_north( CHAR_DATA* ch, const char* argument)
+void do_north( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_NORTH ), 0 );
    return;
 }
 
-void do_east( CHAR_DATA* ch, const char* argument)
+void do_east( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_EAST ), 0 );
    return;
 }
 
-void do_south( CHAR_DATA* ch, const char* argument)
+void do_south( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_SOUTH ), 0 );
    return;
 }
 
-void do_west( CHAR_DATA* ch, const char* argument)
+void do_west( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_WEST ), 0 );
    return;
 }
 
-void do_up( CHAR_DATA* ch, const char* argument)
+void do_up( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_UP ), 0 );
    return;
 }
 
-void do_down( CHAR_DATA* ch, const char* argument)
+void do_down( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_DOWN ), 0 );
    return;
 }
 
-void do_northeast( CHAR_DATA* ch, const char* argument)
+void do_northeast( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_NORTHEAST ), 0 );
    return;
 }
 
-void do_northwest( CHAR_DATA* ch, const char* argument)
+void do_northwest( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_NORTHWEST ), 0 );
    return;
 }
 
-void do_southeast( CHAR_DATA* ch, const char* argument)
+void do_southeast( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_SOUTHEAST ), 0 );
    return;
 }
 
-void do_southwest( CHAR_DATA* ch, const char* argument)
+void do_southwest( CHAR_DATA * ch, char *argument )
 {
    move_char( ch, get_exit( ch->in_room, DIR_SOUTHWEST ), 0 );
    return;
 }
 
-EXIT_DATA *find_door( CHAR_DATA * ch, const char *arg, bool quiet )
+EXIT_DATA *find_door( CHAR_DATA * ch, char *arg, bool quiet )
 {
    EXIT_DATA *pexit;
    int door;
@@ -1415,7 +1429,7 @@ void toggle_bexit_flag( EXIT_DATA * pexit, int flag )
       TOGGLE_BIT( pexit_rev->exit_info, flag );
 }
 
-void do_open( CHAR_DATA* ch, const char* argument)
+void do_open( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -1442,7 +1456,7 @@ void do_open( CHAR_DATA* ch, const char* argument)
          ch_printf( ch, "You see no %s here.\r\n", arg );
          return;
       }
-      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) || IS_SET( pexit->exit_info, EX_DIG ) )
+      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
       {
          send_to_char( "You can't do that.\r\n", ch );
          return;
@@ -1523,7 +1537,7 @@ void do_open( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_close( CHAR_DATA* ch, const char* argument)
+void do_close( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -1545,18 +1559,11 @@ void do_close( CHAR_DATA* ch, const char* argument)
        */
       EXIT_DATA *pexit_rev;
 
-      if( IS_SET( pexit->exit_info, EX_SECRET ) && pexit->keyword && !nifty_is_name( arg, pexit->keyword ) )
-      {
-         ch_printf( ch, "You see no %s here.\r\n", arg );
-         return;
-      }
-
       if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
       {
          send_to_char( "You can't do that.\r\n", ch );
          return;
       }
-
       if( IS_SET( pexit->exit_info, EX_CLOSED ) )
       {
          send_to_char( "It's already closed.\r\n", ch );
@@ -1641,7 +1648,7 @@ OBJ_DATA *has_key( CHAR_DATA * ch, int key )
    return NULL;
 }
 
-void do_lock( CHAR_DATA* ch, const char* argument)
+void do_lock( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj, *key;
@@ -1661,36 +1668,27 @@ void do_lock( CHAR_DATA* ch, const char* argument)
       /*
        * 'lock door' 
        */
-      if( IS_SET( pexit->exit_info, EX_SECRET ) && pexit->keyword && !nifty_is_name( arg, pexit->keyword ) )
-      {
-         ch_printf( ch, "You see no %s here.\r\n", arg );
-         return;
-      }
 
       if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
       {
          send_to_char( "You can't do that.\r\n", ch );
          return;
       }
-
       if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
       {
          send_to_char( "It's not closed.\r\n", ch );
          return;
       }
-
       if( pexit->key < 0 )
       {
          send_to_char( "It can't be locked.\r\n", ch );
          return;
       }
-
       if( ( key = has_key( ch, pexit->key ) ) == NULL )
       {
          send_to_char( "You lack the key.\r\n", ch );
          return;
       }
-
       if( IS_SET( pexit->exit_info, EX_LOCKED ) )
       {
          send_to_char( "It's already locked.\r\n", ch );
@@ -1753,7 +1751,7 @@ void do_lock( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_unlock( CHAR_DATA* ch, const char* argument)
+void do_unlock( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj, *key;
@@ -1773,36 +1771,27 @@ void do_unlock( CHAR_DATA* ch, const char* argument)
       /*
        * 'unlock door' 
        */
-      if( IS_SET( pexit->exit_info, EX_SECRET ) && pexit->keyword && !nifty_is_name( arg, pexit->keyword ) )
-      {
-         ch_printf( ch, "You see no %s here.\r\n", arg );
-         return;
-      }
 
       if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
       {
          send_to_char( "You can't do that.\r\n", ch );
          return;
       }
-
       if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
       {
          send_to_char( "It's not closed.\r\n", ch );
          return;
       }
-
       if( pexit->key < 0 )
       {
          send_to_char( "It can't be unlocked.\r\n", ch );
          return;
       }
-
       if( ( key = has_key( ch, pexit->key ) ) == NULL )
       {
          send_to_char( "You lack the key.\r\n", ch );
          return;
       }
-
       if( !IS_SET( pexit->exit_info, EX_LOCKED ) )
       {
          send_to_char( "It's already unlocked.\r\n", ch );
@@ -1875,127 +1864,7 @@ void do_unlock( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-/*
- * This function bolts a door. Written by Blackmane
- */
-void do_bolt( CHAR_DATA* ch, const char* argument)
-{
-   char arg[MAX_INPUT_LENGTH];
-   EXIT_DATA *pexit;
-
-   one_argument( argument, arg );
-
-   if( arg[0] == '\0' )
-   {
-      send_to_char( "Bolt what?\r\n", ch );
-      return;
-   }
-
-   if( ( pexit = find_door( ch, arg, TRUE ) ) != NULL )
-   {
-      if( IS_SET( pexit->exit_info, EX_SECRET ) && pexit->keyword && !nifty_is_name( arg, pexit->keyword ) )
-      {
-         ch_printf( ch, "You see no %s here.\r\n", arg );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
-      {
-         send_to_char( "You can't do that.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
-      {
-         send_to_char( "It's not closed.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_ISBOLT ) )
-      {
-         send_to_char( "You don't see a bolt.\r\n", ch );
-         return;
-      }
-
-      if( IS_SET( pexit->exit_info, EX_BOLTED ) )
-      {
-         send_to_char( "It's already bolted.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_SECRET ) || ( pexit->keyword && nifty_is_name( arg, pexit->keyword ) ) )
-      {
-         send_to_char( "*Clunk*\r\n", ch );
-         act( AT_ACTION, "$n bolts the $d.", ch, NULL, pexit->keyword, TO_ROOM );
-         set_bexit_flag( pexit, EX_BOLTED );
-         return;
-      }
-   }
-   ch_printf( ch, "You see no %s here.\r\n", arg );
-   return;
-}
-
-/*
- * This function unbolts a door.  Written by Blackmane
- */
-void do_unbolt( CHAR_DATA* ch, const char* argument)
-{
-   char arg[MAX_INPUT_LENGTH];
-   EXIT_DATA *pexit;
-
-   one_argument( argument, arg );
-
-   if( arg[0] == '\0' )
-   {
-      send_to_char( "Unbolt what?\r\n", ch );
-      return;
-   }
-
-   if( ( pexit = find_door( ch, arg, TRUE ) ) != NULL )
-   {
-      if( IS_SET( pexit->exit_info, EX_SECRET ) && pexit->keyword && !nifty_is_name( arg, pexit->keyword ) )
-      {
-         ch_printf( ch, "You see no %s here.\r\n", arg );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
-      {
-         send_to_char( "You can't do that.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
-      {
-         send_to_char( "It's not closed.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_ISBOLT ) )
-      {
-         send_to_char( "You don't see a bolt.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_BOLTED ) )
-      {
-         send_to_char( "It's already unbolted.\r\n", ch );
-         return;
-      }
-
-      if( !IS_SET( pexit->exit_info, EX_SECRET ) || ( pexit->keyword && nifty_is_name( arg, pexit->keyword ) ) )
-      {
-         send_to_char( "*Clunk*\r\n", ch );
-         act( AT_ACTION, "$n unbolts the $d.", ch, NULL, pexit->keyword, TO_ROOM );
-         remove_bexit_flag( pexit, EX_BOLTED );
-         return;
-      }
-   }
-   ch_printf( ch, "You see no %s here.\r\n", arg );
-   return;
-}
-
-void do_bashdoor( CHAR_DATA* ch, const char* argument)
+void do_bashdoor( CHAR_DATA * ch, char *argument )
 {
    EXIT_DATA *pexit;
    char arg[MAX_INPUT_LENGTH];
@@ -2025,7 +1894,7 @@ void do_bashdoor( CHAR_DATA* ch, const char* argument)
       ROOM_INDEX_DATA *to_room;
       EXIT_DATA *pexit_rev;
       int schance;
-      const char *keyword;
+      char *keyword;
 
       if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
       {
@@ -2094,7 +1963,7 @@ void do_bashdoor( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_stand( CHAR_DATA* ch, const char* argument)
+void do_stand( CHAR_DATA * ch, char *argument )
 {
    switch ( ch->position )
    {
@@ -2138,7 +2007,7 @@ void do_stand( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_sit( CHAR_DATA* ch, const char* argument)
+void do_sit( CHAR_DATA * ch, char *argument )
 {
    switch ( ch->position )
    {
@@ -2184,7 +2053,7 @@ void do_sit( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_rest( CHAR_DATA* ch, const char* argument)
+void do_rest( CHAR_DATA * ch, char *argument )
 {
    switch ( ch->position )
    {
@@ -2233,7 +2102,7 @@ void do_rest( CHAR_DATA* ch, const char* argument)
 }
 
 
-void do_sleep( CHAR_DATA* ch, const char* argument)
+void do_sleep( CHAR_DATA * ch, char *argument )
 {
    switch ( ch->position )
    {
@@ -2296,7 +2165,8 @@ void do_sleep( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_wake( CHAR_DATA* ch, const char* argument)
+
+void do_wake( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    CHAR_DATA *victim;
@@ -2304,8 +2174,7 @@ void do_wake( CHAR_DATA* ch, const char* argument)
    one_argument( argument, arg );
    if( arg[0] == '\0' )
    {
-      interpret( ch, "stand" );
-      interpret( ch, "look auto" );
+      do_stand( ch, argument );
       return;
    }
 
@@ -2315,7 +2184,7 @@ void do_wake( CHAR_DATA* ch, const char* argument)
       return;
    }
 
-   if( !( victim = get_char_room( ch, arg ) ) )
+   if( ( victim = get_char_room( ch, arg ) ) == NULL )
    {
       send_to_char( "They aren't here.\r\n", ch );
       return;
@@ -2336,9 +2205,9 @@ void do_wake( CHAR_DATA* ch, const char* argument)
    act( AT_ACTION, "You wake $M.", ch, NULL, victim, TO_CHAR );
    victim->position = POS_STANDING;
    act( AT_ACTION, "$n wakes you.", ch, NULL, victim, TO_VICT );
-   interpret( victim, "look auto" );
    return;
 }
+
 
 /*
  * teleport a character to another room
@@ -2355,14 +2224,14 @@ void teleportch( CHAR_DATA * ch, ROOM_INDEX_DATA * room, bool show )
    act( AT_ACTION, "$n arrives suddenly!", ch, NULL, NULL, TO_ROOM );
    if( show )
       do_look( ch, "auto" );
-   if( xIS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
+   if( IS_SET( ch->in_room->room_flags, ROOM_DEATH ) && !IS_IMMORTAL( ch ) )
    {
       act( AT_DEAD, "$n falls prey to a terrible death!", ch, NULL, NULL, TO_ROOM );
       set_char_color( AT_DEAD, ch );
       send_to_char( "Oopsie... you're dead!\r\n", ch );
       snprintf( buf, MAX_STRING_LENGTH, "%s hit a DEATH TRAP in room %d!", ch->name, ch->in_room->vnum );
       log_string( buf );
-      to_channel( buf, CHANNEL_DEATH, "Death", LEVEL_IMMORTAL );
+      to_channel( buf, CHANNEL_MONITOR, "Monitor", LEVEL_IMMORTAL );
       extract_char( ch, FALSE );
    }
 }
@@ -2417,10 +2286,12 @@ void teleport( CHAR_DATA * ch, int room, int flags )
 /*
  * "Climb" in a certain direction.				-Thoric
  */
-void do_climb( CHAR_DATA* ch, const char* argument)
+void do_climb( CHAR_DATA * ch, char *argument )
 {
    EXIT_DATA *pexit;
+   bool found;
 
+   found = FALSE;
    if( argument[0] == '\0' )
    {
       for( pexit = ch->in_room->first_exit; pexit; pexit = pexit->next )
@@ -2445,10 +2316,12 @@ void do_climb( CHAR_DATA* ch, const char* argument)
 /*
  * "enter" something (moves through an exit)			-Thoric
  */
-void do_enter( CHAR_DATA* ch, const char* argument)
+void do_enter( CHAR_DATA * ch, char *argument )
 {
    EXIT_DATA *pexit;
+   bool found;
 
+   found = FALSE;
    if( argument[0] == '\0' )
    {
       for( pexit = ch->in_room->first_exit; pexit; pexit = pexit->next )
@@ -2460,7 +2333,7 @@ void do_enter( CHAR_DATA* ch, const char* argument)
       if( ch->in_room->sector_type != SECT_INSIDE && IS_OUTSIDE( ch ) )
          for( pexit = ch->in_room->first_exit; pexit; pexit = pexit->next )
             if( pexit->to_room && ( pexit->to_room->sector_type == SECT_INSIDE
-                                    || xIS_SET( pexit->to_room->room_flags, ROOM_INDOORS ) ) )
+                                    || IS_SET( pexit->to_room->room_flags, ROOM_INDOORS ) ) )
             {
                move_char( ch, pexit, 0 );
                return;
@@ -2481,10 +2354,12 @@ void do_enter( CHAR_DATA* ch, const char* argument)
 /*
  * Leave through an exit.					-Thoric
  */
-void do_leave( CHAR_DATA* ch, const char* argument)
+void do_leave( CHAR_DATA * ch, char *argument )
 {
    EXIT_DATA *pexit;
+   bool found;
 
+   found = FALSE;
    if( argument[0] == '\0' )
    {
       for( pexit = ch->in_room->first_exit; pexit; pexit = pexit->next )
@@ -2496,7 +2371,7 @@ void do_leave( CHAR_DATA* ch, const char* argument)
       if( ch->in_room->sector_type == SECT_INSIDE || !IS_OUTSIDE( ch ) )
          for( pexit = ch->in_room->first_exit; pexit; pexit = pexit->next )
             if( pexit->to_room && pexit->to_room->sector_type != SECT_INSIDE
-                && !xIS_SET( pexit->to_room->room_flags, ROOM_INDOORS ) )
+                && !IS_SET( pexit->to_room->room_flags, ROOM_INDOORS ) )
             {
                move_char( ch, pexit, 0 );
                return;
@@ -2541,12 +2416,12 @@ ch_ret pullcheck( CHAR_DATA * ch, int pulse )
    bool move = FALSE, moveobj = TRUE, showroom = TRUE;
    int pullfact, pull;
    int resistance;
-   const char *tochar = NULL, *toroom = NULL, *objmsg = NULL;
-   const char *destrm = NULL, *destob = NULL, *dtxt = "somewhere";
+   char *tochar = NULL, *toroom = NULL, *objmsg = NULL;
+   char *destrm = NULL, *destob = NULL, *dtxt = "somewhere";
 
    if( ( room = ch->in_room ) == NULL )
    {
-      bug( "%s: %s not in a room?!?", __func__, ch->name );
+      bug( "pullcheck: %s not in a room?!?", ch->name );
       return rNONE;
    }
 
@@ -2577,28 +2452,12 @@ ch_ret pullcheck( CHAR_DATA * ch, int pulse )
          {
             pull = xit->pull;
             pullfact = URANGE( 1, 20 - ( abs( pull ) / 5 ), 20 );
-            if( ( pulse % pullfact ) == 0 )
+            if( ( pulse % pullfact ) != 0 )
                break;
          }
 
       if( !xit )
          return rNONE;
-   }
-
-   if( IS_SET( xit->exit_info, EX_CLOSED ) )
-      return rNONE;
-
-   /*
-    * check for tunnel 
-    */
-   if( xit->to_room->tunnel > 0 )
-   {
-      CHAR_DATA *ctmp;
-      int count = ch->mount ? 1 : 0;
-
-      for( ctmp = xit->to_room->first_person; ctmp; ctmp = ctmp->next_in_room )
-         if( ++count >= xit->to_room->tunnel )
-            return rNONE;
    }
 
    /*
@@ -2838,6 +2697,7 @@ ch_ret pullcheck( CHAR_DATA * ch, int pulse )
          break;
    }
 
+
    /*
     * Do the moving 
     */
@@ -2855,16 +2715,22 @@ ch_ret pullcheck( CHAR_DATA * ch, int pulse )
          act( AT_PLAIN, toroom, ch, NULL, dir_name[xit->vdir], TO_ROOM );
 
       /*
+       * display an appropriate entrance message 
+       */
+      if( destrm && xit->to_room->first_person )
+      {
+         act( AT_PLAIN, destrm, xit->to_room->first_person, NULL, dtxt, TO_CHAR );
+         act( AT_PLAIN, destrm, xit->to_room->first_person, NULL, dtxt, TO_ROOM );
+      }
+
+
+      /*
        * move the char 
        */
       if( xit->pulltype == PULL_SLIP )
          return move_char( ch, xit, 1 );
       char_from_room( ch );
       char_to_room( ch, xit->to_room );
-
-      /* display an appropriate entrance message */
-      if( destrm )
-         act( AT_PLAIN, destrm, ch, NULL, dtxt, TO_NOTVICT );
 
       if( showroom )
          do_look( ch, "auto" );
@@ -2940,4 +2806,106 @@ ch_ret pullcheck( CHAR_DATA * ch, int pulse )
       }
    }
    return rNONE;
+}
+
+/*
+ * This function bolts a door. Written by Blackmane
+ */
+void do_bolt( CHAR_DATA * ch, char *argument )
+{
+   char arg[MAX_INPUT_LENGTH];
+   EXIT_DATA *pexit;
+
+   one_argument( argument, arg );
+
+   if( arg[0] == '\0' )
+   {
+      send_to_char( "Bolt what?\r\n", ch );
+      return;
+   }
+
+   if( ( pexit = find_door( ch, arg, TRUE ) ) != NULL )
+   {
+      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
+      {
+         send_to_char( "You can't do that.\r\n", ch );
+         return;
+      }
+      if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
+      {
+         send_to_char( "It's not closed.\r\n", ch );
+         return;
+      }
+      if( !IS_SET( pexit->exit_info, EX_ISBOLT ) )
+      {
+         send_to_char( "You don't see a bolt.\r\n", ch );
+         return;
+      }
+      if( IS_SET( pexit->exit_info, EX_BOLTED ) )
+      {
+         send_to_char( "It's already bolted.\r\n", ch );
+         return;
+      }
+
+      if( !IS_SET( pexit->exit_info, EX_SECRET ) || ( pexit->keyword && nifty_is_name( arg, pexit->keyword ) ) )
+      {
+         send_to_char( "*Clunk*\r\n", ch );
+         act( AT_ACTION, "$n bolts the $d.", ch, NULL, pexit->keyword, TO_ROOM );
+         set_bexit_flag( pexit, EX_BOLTED );
+         return;
+      }
+   }
+   ch_printf( ch, "You see no %s here.\r\n", arg );
+   return;
+}
+
+/*
+ * This function unbolts a door.  Written by Blackmane
+ */
+void do_unbolt( CHAR_DATA * ch, char *argument )
+{
+   char arg[MAX_INPUT_LENGTH];
+   EXIT_DATA *pexit;
+
+   one_argument( argument, arg );
+
+   if( arg[0] == '\0' )
+   {
+      send_to_char( "Unbolt what?\r\n", ch );
+      return;
+   }
+
+   if( ( pexit = find_door( ch, arg, TRUE ) ) != NULL )
+   {
+      if( !IS_SET( pexit->exit_info, EX_ISDOOR ) )
+      {
+         send_to_char( "You can't do that.\r\n", ch );
+         return;
+      }
+      if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
+      {
+         send_to_char( "It's not closed.\r\n", ch );
+         return;
+      }
+      if( !IS_SET( pexit->exit_info, EX_ISBOLT ) )
+      {
+         send_to_char( "You don't see a bolt.\r\n", ch );
+         return;
+      }
+      if( !IS_SET( pexit->exit_info, EX_BOLTED ) )
+      {
+         send_to_char( "It's already unbolted.\r\n", ch );
+         return;
+      }
+
+      if( !IS_SET( pexit->exit_info, EX_SECRET ) || ( pexit->keyword && nifty_is_name( arg, pexit->keyword ) ) )
+      {
+         send_to_char( "*Clunk*\r\n", ch );
+         act( AT_ACTION, "$n unbolts the $d.", ch, NULL, pexit->keyword, TO_ROOM );
+         remove_bexit_flag( pexit, EX_BOLTED );
+         return;
+      }
+   }
+   ch_printf( ch, "You see no %s here.\r\n", arg );
+   return;
 }

@@ -1,11 +1,11 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
@@ -28,13 +28,13 @@ void comment_remove( CHAR_DATA * victim, NOTE_DATA * pnote )
 {
    if( !victim->comments )
    {
-      bug( "%s: null board", __func__ );
+      bug( "%s", "comment remove: null board" );
       return;
    }
 
    if( !pnote )
    {
-      bug( "%s: null pnote", __func__ );
+      bug( "%s", "comment remove: null pnote" );
       return;
    }
 
@@ -45,12 +45,6 @@ void comment_remove( CHAR_DATA * victim, NOTE_DATA * pnote )
       victim->comments = pnote->next;
    else
       pnote->prev->next = pnote->next;
-
-   /*
-    * Fixed a big crash bug here - Luc 08/2000 
-    */
-   if( pnote->next )
-      pnote->next->prev = pnote->prev;
 
    STRFREE( pnote->text );
    STRFREE( pnote->subject );
@@ -67,7 +61,7 @@ void comment_remove( CHAR_DATA * victim, NOTE_DATA * pnote )
    return;
 }
 
-void do_comment( CHAR_DATA* ch, const char* argument)
+void do_comment( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    char arg1[MAX_INPUT_LENGTH];
@@ -105,13 +99,13 @@ void do_comment( CHAR_DATA* ch, const char* argument)
       case SUB_WRITING_NOTE:
          if( !ch->pnote )
          {
-            bug( "%s: note got lost?", __func__ );
+            bug( "%s", "do_comment: note got lost?" );
             send_to_char( "Your note got lost!\r\n", ch );
             stop_editing( ch );
             return;
          }
          if( ch->dest_buf != ch->pnote )
-            bug( "%s: sub_writing_note: ch->dest_buf != ch->pnote", __func__ );
+            bug( "%s", "do_comment: sub_writing_note: ch->dest_buf != ch->pnote" );
          STRFREE( ch->pnote->text );
          ch->pnote->text = copy_buffer( ch );
          stop_editing( ch );
@@ -124,6 +118,7 @@ void do_comment( CHAR_DATA* ch, const char* argument)
 
    if( !str_cmp( arg, "about" ) )
    {
+
       victim = get_char_world( ch, argument );
       if( !victim )
       {
@@ -136,7 +131,10 @@ void do_comment( CHAR_DATA* ch, const char* argument)
          send_to_char( "No comments about mobs\r\n", ch );
          return;
       }
+
+
    }
+
 
    if( !str_cmp( arg, "list" ) )
    {
@@ -207,6 +205,8 @@ void do_comment( CHAR_DATA* ch, const char* argument)
          send_to_char( "There are no relevant comments.\r\n", ch );
          return;
       }
+
+
 
       if( !str_cmp( argument, "all" ) )
       {
@@ -343,6 +343,7 @@ void do_comment( CHAR_DATA* ch, const char* argument)
       pnote = ch->pnote;
       ch->pnote = NULL;
 
+
       /*
        * LIFO to make life easier 
        */
@@ -388,16 +389,18 @@ void do_comment( CHAR_DATA* ch, const char* argument)
          return;
       }
 
-      /*
-       * Cleaned it somewhat here - Luc 08/2000 
-       */
       anum = atoi( argument );
+      vnum = 0;
       for( pnote = victim->comments; pnote; pnote = pnote->next )
       {
-         if( get_trust( ch ) >= LEVEL_GOD && !( --anum ) )
+         vnum++;
+         if( ( LEVEL_GOD <= get_trust( ch ) ) && ( vnum == anum ) )
          {
             comment_remove( victim, pnote );
             send_to_char( "Ok.\r\n", ch );
+            /*
+             * act( AT_ACTION, "$n removes a note.", ch, NULL, NULL, TO_ROOM ); 
+             */
             return;
          }
       }
@@ -410,26 +413,21 @@ void do_comment( CHAR_DATA* ch, const char* argument)
    return;
 }
 
+
 void fwrite_comments( CHAR_DATA * ch, FILE * fp )
 {
-   NOTE_DATA *pnote, *last = NULL;
+   NOTE_DATA *pnote;
 
    if( !ch->comments )
       return;
 
-   /*
-    * fread_comment will push the last note read on top of the others,
-    * so let's write them in reverse to preserve note order's - Luc 08/2000 
-    */
    for( pnote = ch->comments; pnote; pnote = pnote->next )
-      last = pnote;
-   for( pnote = last; pnote; pnote = pnote->prev )
    {
       fprintf( fp, "#COMMENT\n" );
-      fprintf( fp, "sender  %s~\n", pnote->sender );
-      fprintf( fp, "date    %s~\n", pnote->date );
-      fprintf( fp, "to      %s~\n", pnote->to_list );
-      fprintf( fp, "subject %s~\n", pnote->subject );
+      fprintf( fp, "sender	%s~\n", pnote->sender );
+      fprintf( fp, "date  	%s~\n", pnote->date );
+      fprintf( fp, "to     	%s~\n", pnote->to_list );
+      fprintf( fp, "subject	%s~\n", pnote->subject );
       fprintf( fp, "text\n%s~\n", pnote->text );
    }
    return;
@@ -477,16 +475,14 @@ void fread_comment( CHAR_DATA * ch, FILE * fp )
          break;
       pnote->text = fread_string( fp );
 
-      /*
-       * Fixed a big bug here - Luc 08/2000 
-       */
-      if( pnote->next )
-         pnote->next->prev = pnote;
-
+      pnote->next = ch->comments;
       pnote->prev = NULL;
       ch->comments = pnote;
       return;
    }
 
-   bug( "%s: bad key word. strap in!", __func__ );
+   bug( "%s", "fread_comment: bad key word. strap in!" );
+   /*
+    * exit( 1 ); 
+    */
 }

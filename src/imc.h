@@ -1,10 +1,10 @@
 /* IMC2 Freedom Client - Developed by Mud Domain.
  *
- * Copyright ©2004-2008 by Roger Libiez ( Samson )
- * Contributions by Johnathan Walker ( Xorith ), Copyright ©2004
- * Additional contributions by Jesse Defer ( Garil ), Copyright ©2004
- * Additional contributions by Rogel, Copyright ©2004
- * Comments and suggestions welcome: http://www.mudbytes.net/imc2-support-forum
+ * Copyright (C)2004 by Roger Libiez ( Samson )
+ * Contributions by Johnathan Walker ( Xorith ), Copyright (C)2004
+ * Additional contributions by Jesse Defer ( Garil ), Copyright (C)2004
+ * Additional contributions by Rogel, Copyright (c) 2004
+ * Comments and suggestions welcome: imc@imc2.org
  * License terms are available in the imc2freedom.license file.
  */
 
@@ -15,25 +15,12 @@
  * This name was chosen to represent the ideals of not only the code, but of the
  * network which spawned it.
  */
-#define IMC_VERSION_STRING "IMC2 Freedom CL-2.2 "
+#define IMC_VERSION_STRING "IMC2 Freedom CL-2.1a "
 #define IMC_VERSION 2
 
 /* Number of entries to keep in the channel histories */
 #define MAX_IMCHISTORY 20
 #define MAX_IMCTELLHISTORY 20
-
-/* Remcon: Ask and ye shall receive. */
-#define IMC_DIR          "../imc/"
-
-#define IMC_CHANNEL_FILE IMC_DIR "imc.channels"
-#define IMC_CONFIG_FILE  IMC_DIR "imc.config"
-#define IMC_BAN_FILE     IMC_DIR "imc.ignores"
-#define IMC_UCACHE_FILE  IMC_DIR "imc.ucache"
-#define IMC_COLOR_FILE   IMC_DIR "imc.color"
-#define IMC_HELP_FILE    IMC_DIR "imc.help"
-#define IMC_CMD_FILE     IMC_DIR "imc.commands"
-#define IMC_HOTBOOT_FILE IMC_DIR "imc.hotboot"
-#define IMC_WHO_FILE     IMC_DIR "imc.who"
 
 /* Make sure you set the macros in the imccfg.h file properly or things get ugly from here. */
 #include "imccfg.h"
@@ -127,7 +114,7 @@ do                            \
 {                             \
    if((point))                \
    {                          \
-      free( (void*) (point));          \
+      free((point));          \
       (point) = NULL;         \
    }                          \
 } while(0)
@@ -211,11 +198,11 @@ typedef struct imc_cmd_alias IMC_ALIAS;   /* Big, bad, bloated command alias thi
 typedef struct imc_packet_handler IMC_PHANDLER; /* custom packet handlers added dynamically */
 typedef struct who_template WHO_TEMPLATE; /* The who templates */
 
-typedef void IMC_FUN( CHAR_DATA * ch, const char *argument );
-#define IMC_CMD( name ) void (name)( CHAR_DATA *ch, const char *argument )
+typedef void IMC_FUN( CHAR_DATA * ch, char *argument );
+#define IMC_CMD( name ) void (name)( CHAR_DATA *ch, char *argument )
 
-typedef void PACKET_FUN( IMC_PACKET * q, const char *packet );
-#define PFUN( name ) void (name)( IMC_PACKET *q, const char *packet )
+typedef void PACKET_FUN( IMC_PACKET * q, char *packet );
+#define PFUN( name ) void (name)( IMC_PACKET *q, char *packet )
 
 extern REMOTEINFO *first_rinfo;
 extern REMOTEINFO *last_rinfo;
@@ -413,7 +400,7 @@ struct who_template
    char *master;
 };
 
-bool imc_command_hook( CHAR_DATA * ch, const char *command, const char *argument );
+bool imc_command_hook( CHAR_DATA * ch, char *command, char *argument );
 void imc_hotboot( void );
 void imc_startup( bool force, int desc, bool connected );
 void imc_shutdown( bool reconnect );
@@ -422,17 +409,8 @@ bool imc_loadchar( CHAR_DATA * ch, FILE * fp, const char *word );
 void imc_savechar( CHAR_DATA * ch, FILE * fp );
 void imc_freechardata( CHAR_DATA * ch );
 void imc_loop( void );
-IMC_CHANNEL *imc_findchannel( const char *name );
-void imc_register_packet_handler( const char *name, PACKET_FUN * func );
-IMC_PACKET *imc_newpacket( const char *from, const char *type, const char *to );
-void imc_addtopacket( IMC_PACKET * p, const char *fmt, ... );
-void imc_write_packet( IMC_PACKET * p );
-char *imc_getData( char *output, const char *key, const char *packet );
-CHAR_DATA *imc_find_user( const char *name );
-char *imc_nameof( const char *src );
-char *imc_mudof( const char *src );
-void imc_send_tell( const char *from, const char *to, const char *txt, int reply );
-
+IMC_CHANNEL *imc_findchannel( char *name );  /* Externalized for comm.c spamguard checks */
+void imc_register_packet_handler( char *name, PACKET_FUN * func );
 #if defined(_DISKIO_H_)
 void imc_load_pfile( CHAR_DATA * ch, char *tag, int num, char *line );
 void imc_save_pfile( struct CHAR_DATA *ch, FBFILE * fp );

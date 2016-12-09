@@ -1,18 +1,18 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                               Planes Module                              *
+ *			                Planes Module                             *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -20,16 +20,17 @@
 
 PLANE_DATA *first_plane, *last_plane;
 
-void do_plist( CHAR_DATA* ch, const char* argument)
+void do_plist( CHAR_DATA * ch, char *argument )
 {
    PLANE_DATA *p;
 
    send_to_char( "Planes:\r\n-------\r\n", ch );
    for( p = first_plane; p; p = p->next )
       ch_printf( ch, "%s\r\n", p->name );
+   return;
 }
 
-void do_pstat( CHAR_DATA* ch, const char* argument)
+void do_pstat( CHAR_DATA * ch, char *argument )
 {
    PLANE_DATA *p;
    char arg[MAX_INPUT_LENGTH];
@@ -41,9 +42,10 @@ void do_pstat( CHAR_DATA* ch, const char* argument)
       return;
    }
    ch_printf( ch, "Name: %s\r\n", p->name );
+   return;
 }
 
-void do_pset( CHAR_DATA* ch, const char* argument)
+void do_pset( CHAR_DATA * ch, char *argument )
 {
    PLANE_DATA *p;
    char arg[MAX_INPUT_LENGTH];
@@ -61,7 +63,6 @@ void do_pset( CHAR_DATA* ch, const char* argument)
       send_to_char( "    name\r\n", ch );
       return;
    }
-
    if( !str_cmp( arg, "save" ) )
    {
       save_planes(  );
@@ -85,13 +86,11 @@ void do_pset( CHAR_DATA* ch, const char* argument)
       send_to_char( "Plane created.\r\n", ch );
       return;
    }
-
    if( !p )
    {
       send_to_char( "Plane doesn't exist.\r\n", ch );
       return;
    }
-
    if( !str_prefix( mod, "delete" ) )
    {
       UNLINK( p, first_plane, last_plane, next, prev );
@@ -101,7 +100,6 @@ void do_pset( CHAR_DATA* ch, const char* argument)
       send_to_char( "Plane deleted.\r\n", ch );
       return;
    }
-
    if( !str_prefix( mod, "name" ) )
    {
       if( plane_lookup( argument ) )
@@ -115,6 +113,7 @@ void do_pset( CHAR_DATA* ch, const char* argument)
       return;
    }
    do_pset( ch, "" );
+   return;
 }
 
 PLANE_DATA *plane_lookup( const char *name )
@@ -124,7 +123,6 @@ PLANE_DATA *plane_lookup( const char *name )
    for( p = first_plane; p; p = p->next )
       if( !str_cmp( name, p->name ) )
          return p;
-
    for( p = first_plane; p; p = p->next )
       if( !str_prefix( name, p->name ) )
          return p;
@@ -142,7 +140,6 @@ void save_planes( void )
       bug( "save_planes: can't open plane file" );
       return;
    }
-
    for( p = first_plane; p; p = p->next )
    {
       fprintf( fp, "#PLANE\n" );
@@ -151,7 +148,7 @@ void save_planes( void )
    }
    fprintf( fp, "#END\n" );
    fclose( fp );
-   fp = NULL;
+   return;
 }
 
 void read_plane( FILE * fp )
@@ -161,7 +158,6 @@ void read_plane( FILE * fp )
    bool fMatch;
 
    CREATE( p, PLANE_DATA, 1 );
-
    for( ;; )
    {
       word = ( feof( fp ) ? "End" : fread_word( fp ) );
@@ -183,18 +179,17 @@ void read_plane( FILE * fp )
                return;
             }
             break;
-
          case 'N':
             KEY( "Name", p->name, fread_string( fp ) );
             break;
       }
-
       if( !fMatch )
       {
-         bug( "%s: unknown field '%s'", __func__, word );
+         bug( "read_plane: unknown field '%s'", word );
          fread_to_eol( fp );
       }
    }
+   return;
 }
 
 void load_planes( void )
@@ -212,10 +207,9 @@ void load_planes( void )
    {
       if( fread_letter( fp ) != '#' )
       {
-         bug( "%s: # not found.", __func__ );
+         bug( "load_planes: # not found." );
          break;
       }
-
       word = fread_word( fp );
       if( !str_cmp( word, "END" ) )
          break;
@@ -223,13 +217,13 @@ void load_planes( void )
          read_plane( fp );
       else
       {
-         bug( "%s: invalid section '%s'", __func__, word );
+         bug( "load_planes: invalid section '%s'.", word );
          break;
       }
    }
    fclose( fp );
-   fp = NULL;
    fpArea = NULL;
+   return;
 }
 
 void build_prime_plane( void )

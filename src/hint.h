@@ -15,7 +15,6 @@
  *                 Online Hints module by Zedd of Slips in Time             *
  ****************************************************************************/
 
-#define HINT_FILE       SYSTEM_DIR "hints.txt"  /* For Hints */
 #define HINT_UPDATEFREQ         1
 
 DECLARE_DO_FUN( do_hintedit );

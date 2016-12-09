@@ -1,21 +1,21 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *          Misc module for general commands: not skills or spells          *
+ *	    Misc module for general commands: not skills or spells	    *
  ****************************************************************************
  * Note: Most of the stuff in here would go in act_obj.c, but act_obj was   *
- * getting big.                                                             *
+ * getting big.								    *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -25,7 +25,633 @@
 
 extern int top_exit;
 
-void do_eat( CHAR_DATA* ch, const char* argument)
+/*
+ * Fill a container
+ * Many enhancements added by Thoric (ie: filling non-drink containers)
+ */
+void do_fill( CHAR_DATA * ch, char *argument )
+{
+   char arg1[MAX_INPUT_LENGTH];
+   char arg2[MAX_INPUT_LENGTH];
+   OBJ_DATA *obj;
+   OBJ_DATA *source;
+   short dest_item, src_item1, src_item2, src_item3;
+   int diff = 0;
+   bool all = FALSE;
+
+   argument = one_argument( argument, arg1 );
+   argument = one_argument( argument, arg2 );
+
+   /*
+    * munch optional words 
+    */
+   if( ( !str_cmp( arg2, "from" ) || !str_cmp( arg2, "with" ) ) && argument[0] != '\0' )
+      argument = one_argument( argument, arg2 );
+
+   if( arg1[0] == '\0' )
+   {
+      send_to_char( "Fill what?\r\n", ch );
+      return;
+   }
+
+   if( ms_find_obj( ch ) )
+      return;
+
+   if( ( obj = get_obj_carry( ch, arg1 ) ) == NULL )
+   {
+      send_to_char( "You do not have that item.\r\n", ch );
+      return;
+   }
+   else
+      dest_item = obj->item_type;
+
+   src_item1 = src_item2 = src_item3 = -1;
+   switch ( dest_item )
+   {
+      default:
+         act( AT_ACTION, "$n tries to fill $p... (Don't ask me how)", ch, obj, NULL, TO_ROOM );
+         send_to_char( "You cannot fill that.\r\n", ch );
+         return;
+         /*
+          * place all fillable item types here 
+          */
+      case ITEM_DRINK_CON:
+         src_item1 = ITEM_FOUNTAIN;
+         src_item2 = ITEM_BLOOD;
+         break;
+      case ITEM_HERB_CON:
+         src_item1 = ITEM_HERB;
+         src_item2 = ITEM_HERB_CON;
+         break;
+      case ITEM_PIPE:
+         src_item1 = ITEM_HERB;
+         src_item2 = ITEM_HERB_CON;
+         break;
+      case ITEM_CONTAINER:
+         src_item1 = ITEM_CONTAINER;
+         src_item2 = ITEM_CORPSE_NPC;
+         src_item3 = ITEM_CORPSE_PC;
+         break;
+   }
+
+   if( dest_item == ITEM_CONTAINER )
+   {
+      if( IS_SET( obj->value[1], CONT_CLOSED ) )
+      {
+         act( AT_PLAIN, "The $d is closed.", ch, NULL, obj->name, TO_CHAR );
+         return;
+      }
+      if( get_real_obj_weight( obj ) / obj->count >= obj->value[0] )
+      {
+         send_to_char( "It's already full as it can be.\r\n", ch );
+         return;
+      }
+   }
+   else
+   {
+      diff = obj->value[0] - obj->value[1];
+      if( diff < 1 || obj->value[1] >= obj->value[0] )
+      {
+         send_to_char( "It's already full as it can be.\r\n", ch );
+         return;
+      }
+   }
+
+   if( dest_item == ITEM_PIPE && IS_SET( obj->value[3], PIPE_FULLOFASH ) )
+   {
+      send_to_char( "It's full of ashes, and needs to be emptied first.\r\n", ch );
+      return;
+   }
+
+   if( arg2[0] != '\0' )
+   {
+      if( dest_item == ITEM_CONTAINER && ( !str_cmp( arg2, "all" ) || !str_prefix( "all.", arg2 ) ) )
+      {
+         all = TRUE;
+         source = NULL;
+      }
+      else
+         /*
+          * This used to let you fill a pipe from an object on the ground.  Seems
+          * to me you should be holding whatever you want to fill a pipe with.
+          * It's nitpicking, but I needed to change it to get a mobprog to work
+          * right.  Check out Lord Fitzgibbon if you're curious.  -Narn 
+          */
+      if( dest_item == ITEM_PIPE )
+      {
+         if( ( source = get_obj_carry( ch, arg2 ) ) == NULL )
+         {
+            send_to_char( "You don't have that item.\r\n", ch );
+            return;
+         }
+         if( source->item_type != src_item1 && source->item_type != src_item2 && source->item_type != src_item3 )
+         {
+            act( AT_PLAIN, "You cannot fill $p with $P!", ch, obj, source, TO_CHAR );
+            return;
+         }
+      }
+      else
+      {
+         if( ( source = get_obj_here( ch, arg2 ) ) == NULL )
+         {
+            send_to_char( "You cannot find that item.\r\n", ch );
+            return;
+         }
+      }
+   }
+   else
+      source = NULL;
+
+   if( !source && dest_item == ITEM_PIPE )
+   {
+      send_to_char( "Fill it with what?\r\n", ch );
+      return;
+   }
+
+   if( !source )
+   {
+      bool found = FALSE;
+      OBJ_DATA *src_next;
+
+      found = FALSE;
+      separate_obj( obj );
+      for( source = ch->in_room->first_content; source; source = src_next )
+      {
+         src_next = source->next_content;
+         if( dest_item == ITEM_CONTAINER )
+         {
+            if( !CAN_WEAR( source, ITEM_TAKE )
+                || IS_OBJ_STAT( source, ITEM_BURIED )
+                || ( IS_OBJ_STAT( source, ITEM_PROTOTYPE ) && !can_take_proto( ch ) )
+                || ch->carry_weight + get_obj_weight( source ) > can_carry_w( ch )
+                || ( get_real_obj_weight( source ) + get_real_obj_weight( obj ) / obj->count ) > obj->value[0] )
+               continue;
+            if( all && arg2[3] == '.' && !nifty_is_name( &arg2[4], source->name ) )
+               continue;
+            obj_from_room( source );
+            if( source->item_type == ITEM_MONEY )
+            {
+               ch->gold += source->value[0];
+               extract_obj( source );
+            }
+            else
+               obj_to_obj( source, obj );
+            found = TRUE;
+         }
+         else if( source->item_type == src_item1 || source->item_type == src_item2 || source->item_type == src_item3 )
+         {
+            found = TRUE;
+            break;
+         }
+      }
+      if( !found )
+      {
+         switch ( src_item1 )
+         {
+            default:
+               send_to_char( "There is nothing appropriate here!\r\n", ch );
+               return;
+            case ITEM_FOUNTAIN:
+               send_to_char( "There is no fountain or pool here!\r\n", ch );
+               return;
+            case ITEM_BLOOD:
+               send_to_char( "There is no blood pool here!\r\n", ch );
+               return;
+            case ITEM_HERB_CON:
+               send_to_char( "There are no herbs here!\r\n", ch );
+               return;
+            case ITEM_HERB:
+               send_to_char( "You cannot find any smoking herbs.\r\n", ch );
+               return;
+         }
+      }
+      if( dest_item == ITEM_CONTAINER )
+      {
+         act( AT_ACTION, "You fill $p.", ch, obj, NULL, TO_CHAR );
+         act( AT_ACTION, "$n fills $p.", ch, obj, NULL, TO_ROOM );
+         return;
+      }
+   }
+
+   if( dest_item == ITEM_CONTAINER )
+   {
+      OBJ_DATA *otmp, *otmp_next;
+      char name[MAX_INPUT_LENGTH];
+      CHAR_DATA *gch;
+      char *pd;
+      bool found = FALSE;
+
+      if( source == obj )
+      {
+         send_to_char( "You can't fill something with itself!\r\n", ch );
+         return;
+      }
+
+      switch ( source->item_type )
+      {
+         default:   /* put something in container */
+            if( !source->in_room /* disallow inventory items */
+                || !CAN_WEAR( source, ITEM_TAKE )
+                || ( IS_OBJ_STAT( source, ITEM_PROTOTYPE ) && !can_take_proto( ch ) )
+                || ch->carry_weight + get_obj_weight( source ) > can_carry_w( ch )
+                || ( get_real_obj_weight( source ) + get_real_obj_weight( obj ) / obj->count ) > obj->value[0] )
+            {
+               send_to_char( "You can't do that.\r\n", ch );
+               return;
+            }
+            separate_obj( obj );
+            act( AT_ACTION, "You take $P and put it inside $p.", ch, obj, source, TO_CHAR );
+            act( AT_ACTION, "$n takes $P and puts it inside $p.", ch, obj, source, TO_ROOM );
+            obj_from_room( source );
+            obj_to_obj( source, obj );
+            break;
+         case ITEM_MONEY:
+            send_to_char( "You can't do that... yet.\r\n", ch );
+            break;
+         case ITEM_CORPSE_PC:
+            if( IS_NPC( ch ) )
+            {
+               send_to_char( "You can't do that.\r\n", ch );
+               return;
+            }
+            if( IS_OBJ_STAT( source, ITEM_CLANCORPSE ) && !IS_IMMORTAL( ch ) )
+            {
+               send_to_char( "Your hands fumble.  Maybe you better loot a different way.\r\n", ch );
+               return;
+            }
+            if( !IS_OBJ_STAT( source, ITEM_CLANCORPSE ) || !IS_SET( ch->pcdata->flags, PCFLAG_DEADLY ) )
+            {
+               pd = source->short_descr;
+               pd = one_argument( pd, name );
+               pd = one_argument( pd, name );
+               pd = one_argument( pd, name );
+               pd = one_argument( pd, name );
+
+               if( str_cmp( name, ch->name ) && !IS_IMMORTAL( ch ) )
+               {
+                  bool fGroup;
+
+                  fGroup = FALSE;
+                  for( gch = first_char; gch; gch = gch->next )
+                  {
+                     if( !IS_NPC( gch ) && is_same_group( ch, gch ) && !str_cmp( name, gch->name ) )
+                     {
+                        fGroup = TRUE;
+                        break;
+                     }
+                  }
+                  if( !fGroup )
+                  {
+                     send_to_char( "That's someone else's corpse.\r\n", ch );
+                     return;
+                  }
+               }
+            }
+         case ITEM_CONTAINER:
+            if( source->item_type == ITEM_CONTAINER   /* don't remove */
+                && IS_SET( source->value[1], CONT_CLOSED ) )
+            {
+               act( AT_PLAIN, "The $d is closed.", ch, NULL, source->name, TO_CHAR );
+               return;
+            }
+         case ITEM_CORPSE_NPC:
+            if( ( otmp = source->first_content ) == NULL )
+            {
+               send_to_char( "It's empty.\r\n", ch );
+               return;
+            }
+            separate_obj( obj );
+            for( ; otmp; otmp = otmp_next )
+            {
+               otmp_next = otmp->next_content;
+
+               if( !CAN_WEAR( otmp, ITEM_TAKE )
+                   || ( IS_OBJ_STAT( otmp, ITEM_PROTOTYPE ) && !can_take_proto( ch ) )
+                   || ch->carry_number + otmp->count > can_carry_n( ch )
+                   || ch->carry_weight + get_obj_weight( otmp ) > can_carry_w( ch )
+                   || ( get_real_obj_weight( source ) + get_real_obj_weight( obj ) / obj->count ) > obj->value[0] )
+                  continue;
+               obj_from_obj( otmp );
+               obj_to_obj( otmp, obj );
+               found = TRUE;
+            }
+            if( found )
+            {
+               act( AT_ACTION, "You fill $p from $P.", ch, obj, source, TO_CHAR );
+               act( AT_ACTION, "$n fills $p from $P.", ch, obj, source, TO_ROOM );
+            }
+            else
+               send_to_char( "There is nothing appropriate in there.\r\n", ch );
+            break;
+      }
+      return;
+   }
+
+   if( source->value[1] < 1 )
+   {
+      send_to_char( "There's none left!\r\n", ch );
+      return;
+   }
+   if( source->count > 1 && source->item_type != ITEM_FOUNTAIN )
+      separate_obj( source );
+   separate_obj( obj );
+
+   switch ( source->item_type )
+   {
+      default:
+         bug( "do_fill: got bad item type: %d", source->item_type );
+         send_to_char( "Something went wrong...\r\n", ch );
+         return;
+      case ITEM_FOUNTAIN:
+         if( obj->value[1] != 0 && obj->value[2] != 0 )
+         {
+            send_to_char( "There is already another liquid in it.\r\n", ch );
+            return;
+         }
+         obj->value[2] = 0;
+         obj->value[1] = obj->value[0];
+         act( AT_ACTION, "You fill $p from $P.", ch, obj, source, TO_CHAR );
+         act( AT_ACTION, "$n fills $p from $P.", ch, obj, source, TO_ROOM );
+         return;
+      case ITEM_BLOOD:
+         if( obj->value[1] != 0 && obj->value[2] != 13 )
+         {
+            send_to_char( "There is already another liquid in it.\r\n", ch );
+            return;
+         }
+         obj->value[2] = 13;
+         if( source->value[1] < diff )
+            diff = source->value[1];
+         obj->value[1] += diff;
+         act( AT_ACTION, "You fill $p from $P.", ch, obj, source, TO_CHAR );
+         act( AT_ACTION, "$n fills $p from $P.", ch, obj, source, TO_ROOM );
+         if( ( source->value[1] -= diff ) < 1 )
+         {
+            extract_obj( source );
+            make_bloodstain( ch );
+         }
+         return;
+      case ITEM_HERB:
+         if( obj->value[1] != 0 && obj->value[2] != source->value[2] )
+         {
+            send_to_char( "There is already another type of herb in it.\r\n", ch );
+            return;
+         }
+         obj->value[2] = source->value[2];
+         if( source->value[1] < diff )
+            diff = source->value[1];
+         obj->value[1] += diff;
+         act( AT_ACTION, "You fill $p with $P.", ch, obj, source, TO_CHAR );
+         act( AT_ACTION, "$n fills $p with $P.", ch, obj, source, TO_ROOM );
+         if( ( source->value[1] -= diff ) < 1 )
+            extract_obj( source );
+         return;
+      case ITEM_HERB_CON:
+         if( obj->value[1] != 0 && obj->value[2] != source->value[2] )
+         {
+            send_to_char( "There is already another type of herb in it.\r\n", ch );
+            return;
+         }
+         obj->value[2] = source->value[2];
+         if( source->value[1] < diff )
+            diff = source->value[1];
+         obj->value[1] += diff;
+         source->value[1] -= diff;
+         act( AT_ACTION, "You fill $p from $P.", ch, obj, source, TO_CHAR );
+         act( AT_ACTION, "$n fills $p from $P.", ch, obj, source, TO_ROOM );
+         return;
+      case ITEM_DRINK_CON:
+         if( obj->value[1] != 0 && obj->value[2] != source->value[2] )
+         {
+            send_to_char( "There is already another liquid in it.\r\n", ch );
+            return;
+         }
+         obj->value[2] = source->value[2];
+         if( source->value[1] < diff )
+            diff = source->value[1];
+         obj->value[1] += diff;
+         source->value[1] -= diff;
+         act( AT_ACTION, "You fill $p from $P.", ch, obj, source, TO_CHAR );
+         act( AT_ACTION, "$n fills $p from $P.", ch, obj, source, TO_ROOM );
+         return;
+   }
+}
+
+void do_drink( CHAR_DATA * ch, char *argument )
+{
+   char arg[MAX_INPUT_LENGTH];
+   OBJ_DATA *obj;
+   int amount;
+   int liquid;
+
+   argument = one_argument( argument, arg );
+   /*
+    * munch optional words 
+    */
+   if( !str_cmp( arg, "from" ) && argument[0] != '\0' )
+      argument = one_argument( argument, arg );
+
+   if( arg[0] == '\0' )
+   {
+      for( obj = ch->in_room->first_content; obj; obj = obj->next_content )
+         if( ( obj->item_type == ITEM_FOUNTAIN ) || ( obj->item_type == ITEM_BLOOD ) )
+            break;
+
+      if( !obj )
+      {
+         send_to_char( "Drink what?\r\n", ch );
+         return;
+      }
+   }
+   else
+   {
+      if( ( obj = get_obj_here( ch, arg ) ) == NULL )
+      {
+         send_to_char( "You can't find it.\r\n", ch );
+         return;
+      }
+   }
+
+   if( obj->count > 1 && obj->item_type != ITEM_FOUNTAIN )
+      separate_obj( obj );
+
+   if( !IS_NPC( ch ) && ch->pcdata->condition[COND_DRUNK] > 40 )
+   {
+      send_to_char( "You fail to reach your mouth.  *Hic*\r\n", ch );
+      return;
+   }
+
+   switch ( obj->item_type )
+   {
+      default:
+         if( obj->carried_by == ch )
+         {
+            act( AT_ACTION, "$n lifts $p up to $s mouth and tries to drink from it...", ch, obj, NULL, TO_ROOM );
+            act( AT_ACTION, "You bring $p up to your mouth and try to drink from it...", ch, obj, NULL, TO_CHAR );
+         }
+         else
+         {
+            act( AT_ACTION, "$n gets down and tries to drink from $p... (Is $e feeling ok?)", ch, obj, NULL, TO_ROOM );
+            act( AT_ACTION, "You get down on the ground and try to drink from $p...", ch, obj, NULL, TO_CHAR );
+         }
+         break;
+
+      case ITEM_POTION:
+         if( obj->carried_by == ch )
+            do_quaff( ch, obj->name );
+         else
+            send_to_char( "You're not carrying that.\r\n", ch );
+         break;
+
+      case ITEM_BLOOD:
+         if( IS_VAMPIRE( ch ) && !IS_NPC( ch ) )
+         {
+            if( obj->timer > 0   /* if timer, must be spilled blood */
+                && ch->level > 5 && ch->pcdata->condition[COND_BLOODTHIRST] > ( 5 + ch->level / 10 ) )
+            {
+               send_to_char( "It is beneath you to stoop to drinking blood from the ground!\r\n", ch );
+               send_to_char( "Unless in dire need, you'd much rather have blood from a victim's neck!\r\n", ch );
+               return;
+            }
+            if( ch->pcdata->condition[COND_BLOODTHIRST] < ( 10 + ch->level ) )
+            {
+               if( ch->pcdata->condition[COND_FULL] >= 48 || ch->pcdata->condition[COND_THIRST] >= 48 )
+               {
+                  send_to_char( "You are too full to drink any blood.\r\n", ch );
+                  return;
+               }
+
+               if( !oprog_use_trigger( ch, obj, NULL, NULL ) )
+               {
+                  act( AT_BLOOD, "$n drinks from the spilled blood.", ch, NULL, NULL, TO_ROOM );
+                  set_char_color( AT_BLOOD, ch );
+                  send_to_char( "You relish in the replenishment of this vital fluid...\r\n", ch );
+                  if( obj->value[1] <= 1 )
+                  {
+                     set_char_color( AT_BLOOD, ch );
+                     send_to_char( "You drink the last drop of blood from the spill.\r\n", ch );
+                     act( AT_BLOOD, "$n drinks the last drop of blood from the spill.", ch, NULL, NULL, TO_ROOM );
+                  }
+               }
+
+               gain_condition( ch, COND_BLOODTHIRST, 1 );
+               gain_condition( ch, COND_FULL, 1 );
+               gain_condition( ch, COND_THIRST, 1 );
+               if( --obj->value[1] <= 0 )
+               {
+                  if( obj->serial == cur_obj )
+                     global_objcode = rOBJ_DRUNK;
+                  extract_obj( obj );
+                  make_bloodstain( ch );
+               }
+            }
+            else
+               send_to_char( "Alas... you cannot consume any more blood.\r\n", ch );
+         }
+         else
+            send_to_char( "It is not in your nature to do such things.\r\n", ch );
+         break;
+
+      case ITEM_FOUNTAIN:
+         if( !oprog_use_trigger( ch, obj, NULL, NULL ) )
+         {
+            act( AT_ACTION, "$n drinks from the fountain.", ch, NULL, NULL, TO_ROOM );
+            send_to_char( "You take a long thirst quenching drink.\r\n", ch );
+         }
+
+         if( !IS_NPC( ch ) )
+            ch->pcdata->condition[COND_THIRST] = 40;
+         break;
+
+      case ITEM_DRINK_CON:
+         if( obj->value[1] <= 0 )
+         {
+            send_to_char( "It is already empty.\r\n", ch );
+            return;
+         }
+
+         if( ( liquid = obj->value[2] ) >= LIQ_MAX )
+         {
+            bug( "Do_drink: bad liquid number %d.", liquid );
+            liquid = obj->value[2] = 0;
+         }
+
+         if( !oprog_use_trigger( ch, obj, NULL, NULL ) )
+         {
+            act( AT_ACTION, "$n drinks $T from $p.", ch, obj, liq_table[liquid].liq_name, TO_ROOM );
+            act( AT_ACTION, "You drink $T from $p.", ch, obj, liq_table[liquid].liq_name, TO_CHAR );
+         }
+
+         amount = 1; /* UMIN(amount, obj->value[1]); */
+         /*
+          * what was this? concentrated drinks?  concentrated water
+          * too I suppose... sheesh! 
+          */
+
+         gain_condition( ch, COND_DRUNK, amount * liq_table[liquid].liq_affect[COND_DRUNK] );
+         gain_condition( ch, COND_FULL, amount * liq_table[liquid].liq_affect[COND_FULL] );
+         gain_condition( ch, COND_THIRST, amount * liq_table[liquid].liq_affect[COND_THIRST] );
+
+         if( !IS_NPC( ch ) )
+         {
+            if( ch->pcdata->condition[COND_DRUNK] > 24 )
+               send_to_char( "You feel quite sloshed.\r\n", ch );
+            else if( ch->pcdata->condition[COND_DRUNK] > 18 )
+               send_to_char( "You feel very drunk.\r\n", ch );
+            else if( ch->pcdata->condition[COND_DRUNK] > 12 )
+               send_to_char( "You feel drunk.\r\n", ch );
+            else if( ch->pcdata->condition[COND_DRUNK] > 8 )
+               send_to_char( "You feel a little drunk.\r\n", ch );
+            else if( ch->pcdata->condition[COND_DRUNK] > 5 )
+               send_to_char( "You feel light headed.\r\n", ch );
+
+            if( ch->pcdata->condition[COND_FULL] > 40 )
+               send_to_char( "You are full.\r\n", ch );
+
+            if( ch->pcdata->condition[COND_THIRST] > 40 )
+               send_to_char( "You feel bloated.\r\n", ch );
+            else if( ch->pcdata->condition[COND_THIRST] > 36 )
+               send_to_char( "Your stomach is sloshing around.\r\n", ch );
+            else if( ch->pcdata->condition[COND_THIRST] > 30 )
+               send_to_char( "You do not feel thirsty.\r\n", ch );
+         }
+
+         if( obj->value[3] )
+         {
+            /*
+             * The drink was poisoned! 
+             */
+            AFFECT_DATA af;
+
+            act( AT_POISON, "$n sputters and gags.", ch, NULL, NULL, TO_ROOM );
+            act( AT_POISON, "You sputter and gag.", ch, NULL, NULL, TO_CHAR );
+            ch->mental_state = URANGE( 20, ch->mental_state + 5, 100 );
+            af.type = gsn_poison;
+            af.duration = 3 * obj->value[3];
+            af.location = APPLY_NONE;
+            af.modifier = 0;
+            af.bitvector = meb( AFF_POISON );
+            affect_join( ch, &af );
+         }
+
+         obj->value[1] -= amount;
+         if( obj->value[1] <= 0 )
+         {
+            send_to_char( "The empty container vanishes.\r\n", ch );
+            if( cur_obj == obj->serial )
+               global_objcode = rOBJ_DRUNK;
+            extract_obj( obj );
+         }
+         break;
+   }
+   if( who_fighting( ch ) && IS_PKILL( ch ) )
+      WAIT_STATE( ch, PULSE_PER_SECOND / 3 );
+   else
+      WAIT_STATE( ch, PULSE_PER_SECOND );
+   return;
+}
+
+void do_eat( CHAR_DATA * ch, char *argument )
 {
    char buf[MAX_STRING_LENGTH];
    OBJ_DATA *obj;
@@ -82,7 +708,7 @@ void do_eat( CHAR_DATA* ch, const char* argument)
                   ch->in_room->sector_type == SECT_WATER_SWIM ||
                   ch->in_room->sector_type == SECT_WATER_NOSWIM ) ? "dissolves in the water" :
                 ( ch->in_room->sector_type == SECT_AIR ||
-                  xIS_SET( ch->in_room->room_flags, ROOM_NOFLOOR ) ) ? "falls far below" : "is trampled underfoot" );
+                  IS_SET( ch->in_room->room_flags, ROOM_NOFLOOR ) ) ? "falls far below" : "is trampled underfoot" );
       act( AT_MAGIC, "$n drops $p, and it $T.", ch, obj, buf, TO_ROOM );
       if( !hgflag )
          act( AT_MAGIC, "Oops, $p slips from your hand and $T!", ch, obj, buf, TO_CHAR );
@@ -190,7 +816,7 @@ void do_eat( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_quaff( CHAR_DATA* ch, const char* argument)
+void do_quaff( CHAR_DATA * ch, char *argument )
 {
    OBJ_DATA *obj;
    ch_ret retcode;
@@ -205,7 +831,7 @@ void do_quaff( CHAR_DATA* ch, const char* argument)
    if( ( obj = find_obj( ch, argument, TRUE ) ) == NULL )
       return;
 
-   if( IS_NPC( ch ) && IS_AFFECTED( ch, AFF_CHARM ) )
+   if( !IS_NPC( ch ) && IS_AFFECTED( ch, AFF_CHARM ) )
       return;
 
    if( obj->item_type != ITEM_POTION )
@@ -239,13 +865,19 @@ void do_quaff( CHAR_DATA* ch, const char* argument)
 
    /*
     * People with nuisance flag feels up quicker. -- Shaddai 
+    */
+   /*
     * Yeah so I can't spell I'm a coder :P --Shaddai 
+    */
+   /*
     * You are now adept at feeling up quickly! -- Blod 
     */
    if( !IS_NPC( ch ) && ch->pcdata->nuisance &&
        ch->pcdata->nuisance->flags > 3
-       && ( ch->pcdata->condition[COND_FULL] >= ( 48 - ( 3 * ch->pcdata->nuisance->flags ) + ch->pcdata->nuisance->power )
-            || ch->pcdata->condition[COND_THIRST] >= ( 48 - ( ch->pcdata->nuisance->flags ) + ch->pcdata->nuisance->power ) ) )
+       && ( ch->pcdata->condition[COND_FULL] >= ( 48 - ( 3 * ch->pcdata->nuisance->flags ) +
+                                                  ch->pcdata->nuisance->power )
+            || ch->pcdata->condition[COND_THIRST] >= ( 48 - ( ch->pcdata->nuisance->flags ) +
+                                                       ch->pcdata->nuisance->power ) ) )
    {
       send_to_char( "Your stomach cannot contain any more.\r\n", ch );
       return;
@@ -298,14 +930,13 @@ void do_quaff( CHAR_DATA* ch, const char* argument)
 
       gain_condition( ch, COND_THIRST, 1 );
       if( !IS_NPC( ch ) && ch->pcdata->condition[COND_THIRST] > 43 )
-         act( AT_ACTION, "You are getting full.", ch, NULL, NULL, TO_CHAR );
+         act( AT_ACTION, "Your stomach is nearing its capacity.", ch, NULL, NULL, TO_CHAR );
       retcode = obj_cast_spell( obj->value[1], obj->value[0], ch, ch, NULL );
       if( retcode == rNONE )
          retcode = obj_cast_spell( obj->value[2], obj->value[0], ch, ch, NULL );
       if( retcode == rNONE )
          retcode = obj_cast_spell( obj->value[3], obj->value[0], ch, ch, NULL );
    }
-
    if( obj->pIndexData->vnum == OBJ_VNUM_FLASK_BREWING )
       sysdata.brewed_used++;
    else
@@ -316,7 +947,7 @@ void do_quaff( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_recite( CHAR_DATA* ch, const char* argument)
+void do_recite( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -408,7 +1039,7 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
    ROOM_INDEX_DATA *room, *to_room;
    EXIT_DATA *pexit, *pexit_rev;
    int edir;
-   const char *txt;
+   char *txt;
 
    if( IS_SET( obj->value[0], TRIG_UP ) )
       isup = TRUE;
@@ -515,63 +1146,54 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
       }
    }
 
-   /*
-    * Death support added by Remcon 
-    */
+   /* Death support added by Remcon */
    if( IS_SET( obj->value[0], TRIG_DEATH ) )
    {
-      /*
-       * Should we really send a message to the room? 
-       */
+      /* Should we really send a message to the room? */
       act( AT_DEAD, "$n falls prey to a terrible death!", ch, NULL, NULL, TO_ROOM );
       act( AT_DEAD, "Oopsie... you're dead!\r\n", ch, NULL, NULL, TO_CHAR );
       snprintf( buf, MAX_STRING_LENGTH, "%s hit a DEATH TRIGGER in room %d!", ch->name, ch->in_room->vnum );
       log_string( buf );
       to_channel( buf, CHANNEL_MONITOR, "Monitor", LEVEL_IMMORTAL );
 
-      /*
-       * Personaly I fiqured if we wanted it to be a full DT we could just have it send them into a DT. 
-       */
+      /* Personaly I fiqured if we wanted it to be a full DT we could just have it send them into a DT. */
       set_cur_char( ch );
       raw_kill( ch, ch );
 
+      /* If you want it to be more like a room deathtrap use this instead */
+/*
+      if( is_npc( ch ) )
+         extract_char( ch, true );
+      else
+         extract_char( ch, false );
+*/
       return;
    }
 
-   /*
-    * Object loading added by Remcon 
-    */
+   /* Object loading added by Remcon */
    if( IS_SET( obj->value[0], TRIG_OLOAD ) )
    {
       OBJ_INDEX_DATA *pObjIndex;
       OBJ_DATA *tobj;
 
-      /*
-       * value[1] for the obj vnum 
-       */
+      /* value[1] for the obj vnum */
       if( !( pObjIndex = get_obj_index( obj->value[1] ) ) )
       {
-         bug( "%s: obj points to invalid object vnum %d", __func__, obj->value[1] );
+         bug( "%s: obj points to invalid object vnum %d", __FUNCTION__, obj->value[1] );
          return;
       }
-      /*
-       * Set room to NULL before the check 
-       */
+      /* Set room to NULL before the check */
       room = NULL;
-      /*
-       * value[2] for the room vnum to put the object in if there is one, 0 for giving it to char or current room 
-       */
+      /* value[2] for the room vnum to put the object in if there is one, 0 for giving it to char or current room */
       if( obj->value[2] > 0 && !( room = get_room_index( obj->value[2] ) ) )
       {
-         bug( "%s: obj points to invalid room vnum %d", __func__, obj->value[2] );
+         bug( "%s: obj points to invalid room vnum %d", __FUNCTION__, obj->value[2] );
          return;
       }
-      /*
-       * Uses value[3] for level 
-       */
+      /* Uses value[3] for level */
       if( !( tobj = create_object( pObjIndex, URANGE( 0, obj->value[3], MAX_LEVEL ) ) ) )
       {
-         bug( "%s: obj couldnt create_obj vnum %d at level %d", __func__, obj->value[1], obj->value[3] );
+         bug( "%s: obj couldnt create_obj vnum %d at level %d", __FUNCTION__, obj->value[1], obj->value[3] );
          return;
       }
       if( room )
@@ -586,61 +1208,48 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
       return;
    }
 
-   /*
-    * Mob loading added by Remcon 
-    */
+   /* Mob loading added by Remcon */
    if( IS_SET( obj->value[0], TRIG_MLOAD ) )
    {
       MOB_INDEX_DATA *pMobIndex;
       CHAR_DATA *mob;
 
-      /*
-       * value[1] for the obj vnum 
-       */
+      /* value[1] for the obj vnum */
       if( !( pMobIndex = get_mob_index( obj->value[1] ) ) )
       {
-         bug( "%s: obj points to invalid mob vnum %d", __func__, obj->value[1] );
+         bug( "%s: obj points to invalid mob vnum %d", __FUNCTION__, obj->value[1] );
          return;
       }
-      /*
-       * Set room to current room before the check 
-       */
+      /* Set room to current room before the check */
       room = ch->in_room;
-      /*
-       * value[2] for the room vnum to put the object in if there is one, 0 for giving it to char or current room 
-       */
+      /* value[2] for the room vnum to put the object in if there is one, 0 for giving it to char or current room */
       if( obj->value[2] > 0 && !( room = get_room_index( obj->value[2] ) ) )
       {
-         bug( "%s: obj points to invalid room vnum %d", __func__, obj->value[2] );
+         bug( "%s: obj points to invalid room vnum %d", __FUNCTION__, obj->value[2] );
          return;
       }
       if( !( mob = create_mobile( pMobIndex ) ) )
       {
-         bug( "%s: obj couldnt create_mobile vnum %d", __func__, obj->value[1] );
+         bug( "%s: obj couldnt create_mobile vnum %d", __FUNCTION__, obj->value[1] );
          return;
       }
       char_to_room( mob, room );
       return;
    }
 
-   /*
-    * Spell casting support added by Remcon 
-    */
+   /* Spell casting support added by Remcon */
    if( IS_SET( obj->value[0], TRIG_CAST ) )
    {
       if( obj->value[1] <= 0 || !IS_VALID_SN( obj->value[1] ) )
       {
-         bug( "%s: obj points to invalid sn [%d]", __func__, obj->value[1] );
+         bug( "%s: obj points to invalid sn [%d]", __FUNCTION__, obj->value[1] );
          return;
       }
-      obj_cast_spell( obj->value[1], URANGE( 1, ( obj->value[2] > 0 ) ? obj->value[2] : ch->level, MAX_LEVEL ), ch, ch,
-                      NULL );
+      obj_cast_spell( obj->value[1], URANGE( 1, ( obj->value[2] > 0 ) ? obj->value[2] : ch->level, MAX_LEVEL ), ch, ch, NULL );
       return;
    }
 
-   /*
-    * Container support added by Remcon 
-    */
+   /* Container support added by Remcon */
    if( IS_SET( obj->value[0], TRIG_CONTAINER ) )
    {
       OBJ_DATA *container = NULL;
@@ -650,7 +1259,7 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
          room = obj->in_room;
       if( !room )
       {
-         bug( "%s: obj points to invalid room %d", __func__, obj->value[1] );
+         bug( "%s: obj points to invalid room %d", __FUNCTION__, obj->value[1] );
          return;
       }
 
@@ -661,23 +1270,17 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
       }
       if( !container )
       {
-         bug( "%s: obj points to a container [%d] thats not where it should be?", __func__, obj->value[2] );
+         bug( "%s: obj points to a container [%d] thats not where it should be?", __FUNCTION__, obj->value[2] );
          return;
       }
       if( container->item_type != ITEM_CONTAINER )
       {
-         bug( "%s: obj points to object [%d], but it isn't a container.", __func__, obj->value[2] );
+         bug( "%s: obj points to object [%d], but it isn't a container.", __FUNCTION__, obj->value[2] );
          return;
       }
-      /*
-       * Could toss in some messages. Limit how it is handled etc... I'll leave that to each one to do 
-       */
-      /*
-       * Started to use TRIG_OPEN, TRIG_CLOSE, TRIG_LOCK, and TRIG_UNLOCK like TRIG_DOOR does. 
-       */
-      /*
-       * It limits it alot, but it wouldn't allow for an EATKEY change 
-       */
+      /* Could toss in some messages. Limit how it is handled etc... I'll leave that to each one to do */
+      /* Started to use TRIG_OPEN, TRIG_CLOSE, TRIG_LOCK, and TRIG_UNLOCK like TRIG_DOOR does. */
+      /* It limits it alot, but it wouldn't allow for an EATKEY change */
       if( IS_SET( obj->value[3], CONT_CLOSEABLE ) )
          TOGGLE_BIT( container->value[1], CONT_CLOSEABLE );
       if( IS_SET( obj->value[3], CONT_PICKPROOF ) )
@@ -815,7 +1418,7 @@ void pullorpush( CHAR_DATA * ch, OBJ_DATA * obj, bool pull )
    }
 }
 
-void do_pull( CHAR_DATA* ch, const char* argument)
+void do_pull( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -839,7 +1442,7 @@ void do_pull( CHAR_DATA* ch, const char* argument)
    pullorpush( ch, obj, TRUE );
 }
 
-void do_push( CHAR_DATA* ch, const char* argument)
+void do_push( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *obj;
@@ -863,7 +1466,7 @@ void do_push( CHAR_DATA* ch, const char* argument)
    pullorpush( ch, obj, FALSE );
 }
 
-void do_rap( CHAR_DATA* ch, const char* argument)
+void do_rap( CHAR_DATA * ch, char *argument )
 {
    EXIT_DATA *pexit;
    char arg[MAX_INPUT_LENGTH];
@@ -884,7 +1487,7 @@ void do_rap( CHAR_DATA* ch, const char* argument)
    {
       ROOM_INDEX_DATA *to_room;
       EXIT_DATA *pexit_rev;
-      const char *keyword;
+      char *keyword;
       if( !IS_SET( pexit->exit_info, EX_CLOSED ) )
       {
          send_to_char( "Why knock?  It's open.\r\n", ch );
@@ -914,7 +1517,7 @@ void do_rap( CHAR_DATA* ch, const char* argument)
 }
 
 /* pipe commands (light, tamp, smoke) by Thoric */
-void do_tamp( CHAR_DATA* ch, const char* argument)
+void do_tamp( CHAR_DATA * ch, char *argument )
 {
    OBJ_DATA *opipe;
    char arg[MAX_INPUT_LENGTH];
@@ -949,7 +1552,7 @@ void do_tamp( CHAR_DATA* ch, const char* argument)
    send_to_char( "It doesn't need tamping.\r\n", ch );
 }
 
-void do_smoke( CHAR_DATA* ch, const char* argument)
+void do_smoke( CHAR_DATA * ch, char *argument )
 {
    OBJ_DATA *opipe;
    char arg[MAX_INPUT_LENGTH];
@@ -1013,141 +1616,179 @@ void do_smoke( CHAR_DATA* ch, const char* argument)
    }
 }
 
-OBJ_DATA *find_tinder( CHAR_DATA *ch )
+void do_light( CHAR_DATA * ch, char *argument )
 {
-   OBJ_DATA *tinder;
-
-   for( tinder = ch->last_carrying; tinder; tinder = tinder->prev_content )
-      if( ( tinder->item_type == ITEM_TINDER ) && can_see_obj( ch, tinder ) )
-         return tinder;
-   return NULL;
-}
-
-void do_extinguish( CHAR_DATA *ch, const char *argument )
-{
-   OBJ_DATA *obj;
+   OBJ_DATA *opipe;
    char arg[MAX_INPUT_LENGTH];
 
    one_argument( argument, arg );
-   if( arg[0] == '\0' )
-   {
-      send_to_char( "Extinguish what?\r\n", ch );
-      return;
-   }
-
-   if( ms_find_obj( ch ) )
-      return;
-
-   if( ( obj = get_obj_wear( ch, arg ) ) == NULL )
-      if( ( obj = get_obj_carry( ch, arg ) ) == NULL )
-         if( ( obj = get_obj_list_rev( ch, arg, ch->in_room->last_content ) ) == NULL )
-   {
-      send_to_char( "You aren't carrying that.\r\n", ch );
-      return;
-   }
-
-   separate_obj( obj );
-
-   if( obj->item_type != ITEM_LIGHT || ( obj->value[1] < 1 ) )
-   {
-      send_to_char( "You can't extinguish that.\r\n", ch );
-      return;
-   }
-
-   if( IS_SET( obj->value[3], PIPE_LIT ) )
-   {
-      act( AT_ACTION, "You extinguish $p.", ch, obj, NULL, TO_CHAR );
-      act( AT_ACTION, "$n extinguishes $p.", ch, obj, NULL, TO_ROOM );
-      REMOVE_BIT( obj->value[3], PIPE_LIT );
-      return;
-   }
-   else
-   {
-      send_to_char( "It's not lit.\r\n", ch );
-      return;
-   }
-}
-
-void do_light( CHAR_DATA *ch, const char *argument )
-{
-   OBJ_DATA *obj;
-   char arg[MAX_INPUT_LENGTH];
-
-   one_argument( argument, arg );
-
    if( arg[0] == '\0' )
    {
       send_to_char( "Light what?\r\n", ch );
       return;
    }
 
-   if( ms_find_obj(ch) )
+   if( ms_find_obj( ch ) )
       return;
 
-   if( ( obj = get_obj_wear( ch, arg ) ) == NULL )
-      if( ( obj = get_obj_carry( ch, arg ) ) == NULL )
-         if( ( obj = get_obj_list_rev( ch, arg, ch->in_room->last_content ) ) == NULL )
+   if( ( opipe = get_obj_carry( ch, arg ) ) == NULL )
    {
       send_to_char( "You aren't carrying that.\r\n", ch );
       return;
    }
-
-   if( !find_tinder( ch ) )
+   if( opipe->item_type != ITEM_PIPE )
    {
-      send_to_char( "You need some tinder to light with.\r\n", ch );
+      send_to_char( "You can't light that.\r\n", ch );
       return;
    }
+   if( !IS_SET( opipe->value[3], PIPE_LIT ) )
+   {
+      if( opipe->value[1] < 1 )
+      {
+         act( AT_ACTION, "You try to light $p, but it's empty.", ch, opipe, NULL, TO_CHAR );
+         act( AT_ACTION, "$n tries to light $p, but it's empty.", ch, opipe, NULL, TO_ROOM );
+         return;
+      }
+      act( AT_ACTION, "You carefully light $p.", ch, opipe, NULL, TO_CHAR );
+      act( AT_ACTION, "$n carefully lights $p.", ch, opipe, NULL, TO_ROOM );
+      SET_BIT( opipe->value[3], PIPE_LIT );
+      return;
+   }
+   send_to_char( "It's already lit.\r\n", ch );
+}
 
-   separate_obj( obj );
+void do_empty( CHAR_DATA * ch, char *argument )
+{
+   OBJ_DATA *obj;
+   char arg1[MAX_INPUT_LENGTH];
+   char arg2[MAX_INPUT_LENGTH];
 
-   switch( obj->item_type )
+   argument = one_argument( argument, arg1 );
+   argument = one_argument( argument, arg2 );
+   if( !str_cmp( arg2, "into" ) && argument[0] != '\0' )
+      argument = one_argument( argument, arg2 );
+
+   if( arg1[0] == '\0' )
+   {
+      send_to_char( "Empty what?\r\n", ch );
+      return;
+   }
+   if( ms_find_obj( ch ) )
+      return;
+
+   if( ( obj = get_obj_carry( ch, arg1 ) ) == NULL )
+   {
+      send_to_char( "You aren't carrying that.\r\n", ch );
+      return;
+   }
+   if( obj->count > 1 )
+      separate_obj( obj );
+
+   switch ( obj->item_type )
    {
       default:
-         send_to_char( "You can't light that.\r\n", ch );
+         act( AT_ACTION, "You shake $p in an attempt to empty it...", ch, obj, NULL, TO_CHAR );
+         act( AT_ACTION, "$n begins to shake $p in an attempt to empty it...", ch, obj, NULL, TO_ROOM );
          return;
-
       case ITEM_PIPE:
-         if( !IS_SET( obj->value[3], PIPE_LIT ) )
+         act( AT_ACTION, "You gently tap $p and empty it out.", ch, obj, NULL, TO_CHAR );
+         act( AT_ACTION, "$n gently taps $p and empties it out.", ch, obj, NULL, TO_ROOM );
+         REMOVE_BIT( obj->value[3], PIPE_FULLOFASH );
+         REMOVE_BIT( obj->value[3], PIPE_LIT );
+         obj->value[1] = 0;
+         return;
+      case ITEM_DRINK_CON:
+         if( obj->value[1] < 1 )
          {
-            if( obj->value[1] < 1 )
+            send_to_char( "It's already empty.\r\n", ch );
+            return;
+         }
+         act( AT_ACTION, "You empty $p.", ch, obj, NULL, TO_CHAR );
+         act( AT_ACTION, "$n empties $p.", ch, obj, NULL, TO_ROOM );
+         obj->value[1] = 0;
+         return;
+      case ITEM_CONTAINER:
+      case ITEM_QUIVER:
+         if( IS_SET( obj->value[1], CONT_CLOSED ) )
+         {
+            act( AT_PLAIN, "The $d is closed.", ch, NULL, obj->name, TO_CHAR );
+            return;
+         }
+      case ITEM_KEYRING:
+         if( !obj->first_content )
+         {
+            send_to_char( "It's already empty.\r\n", ch );
+            return;
+         }
+         if( arg2[0] == '\0' )
+         {
+            if( IS_SET( ch->in_room->room_flags, ROOM_NODROP ) || ( !IS_NPC( ch ) || xIS_SET( ch->act, PLR_LITTERBUG ) ) )
             {
-               act( AT_ACTION, "You try to light $p, but it's empty.", ch, obj, NULL, TO_CHAR );
-               act( AT_ACTION, "$n tries to light $p, but it's empty.", ch, obj, NULL, TO_ROOM );
+               set_char_color( AT_MAGIC, ch );
+               send_to_char( "A magical force stops you!\r\n", ch );
+               set_char_color( AT_TELL, ch );
+               send_to_char( "Someone tells you, 'No littering here!'\r\n", ch );
                return;
             }
-            act( AT_ACTION, "You carefully light $p.", ch, obj, NULL, TO_CHAR );
-            act( AT_ACTION, "$n carefully lights $p.", ch, obj, NULL, TO_ROOM );
-            SET_BIT( obj->value[3], PIPE_LIT );
-            return;
-         }
-         send_to_char( "It's already lit.\r\n", ch );
-         break;
-
-      case ITEM_LIGHT:
-         if( obj->value[1] > 0 )
-         {
-            if( !IS_SET( obj->value[3], PIPE_LIT ) )
+            if( IS_SET( ch->in_room->room_flags, ROOM_NODROPALL ) || IS_SET( ch->in_room->room_flags, ROOM_CLANSTOREROOM ) )
             {
-               act( AT_ACTION, "You carefully light $p.", ch, obj, NULL, TO_CHAR );
-               act( AT_ACTION, "$n carefully lights $p.", ch, obj, NULL, TO_ROOM );
-               SET_BIT( obj->value[3], PIPE_LIT );
+               send_to_char( "You can't seem to do that here...\r\n", ch );
+               return;
+            }
+            if( empty_obj( obj, NULL, ch->in_room ) )
+            {
+               act( AT_ACTION, "You empty $p.", ch, obj, NULL, TO_CHAR );
+               act( AT_ACTION, "$n empties $p.", ch, obj, NULL, TO_ROOM );
+               if( IS_SET( sysdata.save_flags, SV_EMPTY ) )
+                  save_char_obj( ch );
             }
             else
-               send_to_char( "It's already lit.\r\n", ch );
-            return;
+               send_to_char( "Hmmm... didn't work.\r\n", ch );
          }
          else
-            send_to_char( "You can't light that.\r\n", ch );
-         break;
+         {
+            OBJ_DATA *dest = get_obj_here( ch, arg2 );
+
+            if( !dest )
+            {
+               send_to_char( "You can't find it.\r\n", ch );
+               return;
+            }
+            if( dest == obj )
+            {
+               send_to_char( "You can't empty something into itself!\r\n", ch );
+               return;
+            }
+            if( dest->item_type != ITEM_CONTAINER && dest->item_type != ITEM_KEYRING && dest->item_type != ITEM_QUIVER )
+            {
+               send_to_char( "That's not a container!\r\n", ch );
+               return;
+            }
+            if( IS_SET( dest->value[1], CONT_CLOSED ) )
+            {
+               act( AT_PLAIN, "The $d is closed.", ch, NULL, dest->name, TO_CHAR );
+               return;
+            }
+            separate_obj( dest );
+            if( empty_obj( obj, dest, NULL ) )
+            {
+               act( AT_ACTION, "You empty $p into $P.", ch, obj, dest, TO_CHAR );
+               act( AT_ACTION, "$n empties $p into $P.", ch, obj, dest, TO_ROOM );
+               if( !dest->carried_by && IS_SET( sysdata.save_flags, SV_EMPTY ) )
+                  save_char_obj( ch );
+            }
+            else
+               act( AT_ACTION, "$P is too full.", ch, obj, dest, TO_CHAR );
+         }
+         return;
    }
-   return;
 }
 
 /*
  * Apply a salve/ointment					-Thoric
  * Support for applying to others.  Pkill concerns dealt with elsewhere.
  */
-void do_apply( CHAR_DATA* ch, const char* argument)
+void do_apply( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -1279,7 +1920,7 @@ void actiondesc( CHAR_DATA * ch, OBJ_DATA * obj )
    char charbuf[MAX_STRING_LENGTH];
    char roombuf[MAX_STRING_LENGTH];
 /*   char buf[MAX_STRING_LENGTH]; */
-   const char *srcptr = obj->action_desc;
+   char *srcptr = obj->action_desc;
    char *charptr = charbuf;
    char *roomptr = roombuf;
    const char *ichar = "You";
@@ -1364,13 +2005,9 @@ void actiondesc( CHAR_DATA * ch, OBJ_DATA * obj )
          return;
 
       case ITEM_DRINK_CON:
-      {
-         LIQ_TABLE *liq = get_liq_vnum( obj->value[2] );
-
-         act( AT_ACTION, charbuf, ch, obj, ( liq == NULL ? "water" : liq->name ), TO_CHAR );
-         act( AT_ACTION, roombuf, ch, obj, ( liq == NULL ? "water" : liq->name ), TO_ROOM );
+         act( AT_ACTION, charbuf, ch, obj, liq_table[obj->value[2]].liq_name, TO_CHAR );
+         act( AT_ACTION, roombuf, ch, obj, liq_table[obj->value[2]].liq_name, TO_ROOM );
          return;
-      }
 
       case ITEM_PIPE:
          return;
@@ -1506,7 +2143,7 @@ char *print_bitvector( EXT_BV * bits )
          break;
    for( x = 0; x <= cnt; x++ )
    {
-      snprintf( p, ( XBI * 12 ) - ( p - buf ), "%ud", bits->bits[x] );
+      snprintf( p, ( XBI * 12 ) - ( p - buf ), "%d", bits->bits[x] );
       p += strlen( p );
       if( x < cnt )
          *p++ = '&';

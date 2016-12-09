@@ -1,18 +1,18 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                       Command interpretation module                      *
+ *			 Command interpretation module			    *
  ****************************************************************************/
 
 #include <ctype.h>
@@ -21,19 +21,22 @@
 #include <time.h>
 #include <sys/time.h>
 #include "mud.h"
-#include "news.h"
 
 /*
  * Externals
  */
+void refresh_page( CHAR_DATA * ch );
 void subtract_times( struct timeval *etime, struct timeval *sttime );
-bool check_social( CHAR_DATA * ch, const char *command, const char *argument );
-char *check_cmd_flags( CHAR_DATA * ch, CMDTYPE * cmd );
+bool check_social args( ( CHAR_DATA * ch, char *command, char *argument ) );
+char *check_cmd_flags args( ( CHAR_DATA * ch, CMDTYPE * cmd ) );
+
+
 
 /*
  * Log-all switch.
  */
 bool fLogAll = FALSE;
+
 
 CMDTYPE *command_hash[126];   /* hash table for cmd_table */
 SOCIALTYPE *social_index[27]; /* hash table for socials   */
@@ -43,6 +46,7 @@ SOCIALTYPE *social_index[27]; /* hash table for socials   */
  */
 bool check_pos( CHAR_DATA * ch, short position )
 {
+
    if( IS_NPC( ch ) && ch->position > 3 ) /*Band-aid alert?  -- Blod */
       return TRUE;
 
@@ -85,7 +89,6 @@ bool check_pos( CHAR_DATA * ch, short position )
                send_to_char( "No way!  You are still fighting!\r\n", ch );
             }
             break;
-
          case POS_DEFENSIVE:
             if( position <= POS_EVASIVE )
             {
@@ -96,7 +99,6 @@ bool check_pos( CHAR_DATA * ch, short position )
                send_to_char( "No way!  You are still fighting!\r\n", ch );
             }
             break;
-
          case POS_AGGRESSIVE:
             if( position <= POS_EVASIVE )
             {
@@ -107,7 +109,6 @@ bool check_pos( CHAR_DATA * ch, short position )
                send_to_char( "No way!  You are still fighting!\r\n", ch );
             }
             break;
-
          case POS_BERSERK:
             if( position <= POS_EVASIVE )
             {
@@ -118,7 +119,6 @@ bool check_pos( CHAR_DATA * ch, short position )
                send_to_char( "No way!  You are still fighting!\r\n", ch );
             }
             break;
-
          case POS_EVASIVE:
             send_to_char( "No way!  You are still fighting!\r\n", ch );
             break;
@@ -131,6 +131,7 @@ bool check_pos( CHAR_DATA * ch, short position )
 
 extern char lastplayercmd[MAX_INPUT_LENGTH * 2];
 
+
 /*
  * Determine if this input line is eligible for writing to a watch file.
  * We don't want to write movement commands like (n, s, e, w, etc.)
@@ -140,7 +141,7 @@ bool valid_watch( char *logline )
    int len = strlen( logline );
    char c = logline[0];
 
-   if( len == 1 && ( c == 'l' || c == 'n' || c == 's' || c == 'e' || c == 'w' || c == 'u' || c == 'd' ) )
+   if( len == 1 && ( c == 'n' || c == 's' || c == 'e' || c == 'w' || c == 'u' || c == 'd' ) )
       return FALSE;
    if( len == 2 && c == 'n' && ( logline[1] == 'e' || logline[1] == 'w' ) )
       return FALSE;
@@ -149,6 +150,7 @@ bool valid_watch( char *logline )
 
    return TRUE;
 }
+
 
 /*
  * Write input line to watch files if applicable
@@ -168,7 +170,7 @@ void write_watch_files( CHAR_DATA * ch, CMDTYPE * cmd, char *logline )
 /* sorted by imm name */
    if( cmd )
    {
-      const char *cur_imm;
+      char *cur_imm;
       bool found;
 
       pw = first_watch;
@@ -223,12 +225,6 @@ void write_watch_files( CHAR_DATA * ch, CMDTYPE * cmd, char *logline )
    return;
 }
 
-void interpret( CHAR_DATA * ch, const char* argument)
-{
-    char* temp = strdup(argument);
-    interpret(ch, temp);
-    free(temp);
-}
 
 /*
  * The main entry point for executing commands.
@@ -240,7 +236,6 @@ void interpret( CHAR_DATA * ch, char *argument )
    char logline[MAX_INPUT_LENGTH];
    char logname[MAX_INPUT_LENGTH];
    char log_buf[MAX_STRING_LENGTH];
-   char *origarg = argument;
    char *buf;
    TIMER *timer = NULL;
    CMDTYPE *cmd = NULL;
@@ -250,18 +245,18 @@ void interpret( CHAR_DATA * ch, char *argument )
    struct timeval time_used;
    long tmptime;
 
+
    if( !ch )
    {
-      bug( "%s: null ch!", __func__ );
+      bug( "%s", "interpret: null ch!" );
       return;
    }
 
    if( !ch->in_room )
    {
-      bug( "%s: null in_room!", __func__ );
+      bug( "%s", "interpret: null in_room!" );
       return;
    }
-
    found = FALSE;
    if( ch->substate == SUB_REPEATCMD )
    {
@@ -270,7 +265,7 @@ void interpret( CHAR_DATA * ch, char *argument )
       if( ( fun = ch->last_cmd ) == NULL )
       {
          ch->substate = SUB_NONE;
-         bug( "%s: SUB_REPEATCMD with NULL last_cmd", __func__ );
+         bug( "%s", "interpret: SUB_REPEATCMD with NULL last_cmd" );
          return;
       }
       else
@@ -295,7 +290,7 @@ void interpret( CHAR_DATA * ch, char *argument )
          if( !found )
          {
             cmd = NULL;
-            bug( "%s: SUB_REPEATCMD: last_cmd invalid", __func__ );
+            bug( "%s", "interpret: SUB_REPEATCMD: last_cmd invalid" );
             return;
          }
          snprintf( logline, MAX_INPUT_LENGTH, "(%s) %s", cmd->name, argument );
@@ -309,7 +304,7 @@ void interpret( CHAR_DATA * ch, char *argument )
        */
       if( !argument || !strcmp( argument, "" ) )
       {
-         bug( "%s: null argument!", __func__ );
+         bug( "%s", "interpret: null argument!" );
          return;
       }
 
@@ -362,8 +357,6 @@ void interpret( CHAR_DATA * ch, char *argument )
                   || ( !IS_NPC( ch ) && ch->pcdata->council
                        && is_name( cmd->name, ch->pcdata->council->powers )
                        && cmd->level <= ( trust + MAX_CPD ) )
-                  || ( !IS_NPC( ch ) && IS_SET( ch->pcdata->flags, PCFLAG_RETIRED )
-                       && IS_SET( cmd->flags, CMD_FLAG_RETIRED ) )
                   || ( !IS_NPC( ch ) && ch->pcdata->bestowments && ch->pcdata->bestowments[0] != '\0'
                        && is_name( cmd->name, ch->pcdata->bestowments ) && cmd->level <= ( trust + sysdata.bestow_dif ) ) ) )
          {
@@ -377,6 +370,9 @@ void interpret( CHAR_DATA * ch, char *argument )
       if( !IS_NPC( ch ) && xIS_SET( ch->act, PLR_AFK ) && ( str_cmp( command, "AFK" ) ) )
       {
          xREMOVE_BIT( ch->act, PLR_AFK );
+/*
+     	    act( AT_GREY, "$n is no longer afk.", ch, NULL, NULL, TO_ROOM );
+*/
          act( AT_GREY, "$n is no longer afk.", ch, NULL, NULL, TO_CANSEE );
       }
    }
@@ -401,6 +397,7 @@ void interpret( CHAR_DATA * ch, char *argument )
       else if( IS_SET( ch->pcdata->flags, PCFLAG_WATCH ) )
          write_watch_files( ch, NULL, logline );
    }
+
 
    if( ( !IS_NPC( ch ) && xIS_SET( ch->act, PLR_LOG ) )
        || fLogAll || loglvl == LOG_BUILD || loglvl == LOG_HIGH || loglvl == LOG_ALWAYS )
@@ -436,7 +433,7 @@ void interpret( CHAR_DATA * ch, char *argument )
    /*
     * check for a timer delayed command (search, dig, detrap, etc) 
     */
-   if( ( ( timer = get_timerptr( ch, TIMER_DO_FUN ) ) != NULL ) && ( !found || !IS_SET( cmd->flags, CMD_FLAG_NO_ABORT ) ) )
+   if( ( timer = get_timerptr( ch, TIMER_DO_FUN ) ) != NULL )
    {
       int tempsub;
 
@@ -462,11 +459,7 @@ void interpret( CHAR_DATA * ch, char *argument )
     */
    if( !found )
    {
-      if( !check_skill( ch, command, argument ) && !check_ability( ch, command, argument )   // Racial Abilities Support - Kayle 7-8-07
-          && !rprog_command_trigger( ch, origarg )
-          && !mprog_command_trigger( ch, origarg )
-          && !oprog_command_trigger( ch, origarg )
-          && !check_social( ch, command, argument ) && !news_cmd_hook( ch, command, argument )
+      if( !check_skill( ch, command, argument ) && !check_social( ch, command, argument )
 #ifdef IMC
           && !imc_command_hook( ch, command, argument )
 #endif
@@ -488,8 +481,7 @@ void interpret( CHAR_DATA * ch, char *argument )
                   send_to_char( "You cannot do that here.\r\n", ch );
                return;
             }
-            if( check_pos( ch, POS_STANDING ) )
-               move_char( ch, pexit, 0 );
+            move_char( ch, pexit, 0 );
             return;
          }
          send_to_char( "Huh?\r\n", ch );
@@ -534,6 +526,7 @@ void interpret( CHAR_DATA * ch, char *argument )
    /*
     * Nuisance stuff -- Shaddai
     */
+
    if( !IS_NPC( ch ) && ch->pcdata->nuisance && ch->pcdata->nuisance->flags > 9
        && number_percent(  ) < ( ( ch->pcdata->nuisance->flags - 9 ) * 10 * ch->pcdata->nuisance->power ) )
    {
@@ -549,7 +542,6 @@ void interpret( CHAR_DATA * ch, char *argument )
    start_timer( &time_used );
    ( *cmd->do_fun ) ( ch, argument );
    end_timer( &time_used );
-
    /*
     * Update the record of how many times this command has been used (haus)
     */
@@ -584,17 +576,17 @@ CMDTYPE *find_command( char *command )
    return NULL;
 }
 
-SOCIALTYPE *find_social( const char *command )
+SOCIALTYPE *find_social( char *command )
 {
    SOCIALTYPE *social;
    int hash;
 
-   char c = LOWER( command[0] );
+   command[0] = LOWER(command[0]);
 
-   if( c < 'a' || c > 'z' )
+   if( command[0] < 'a' || command[0] > 'z' )
       hash = 0;
    else
-      hash = ( c - 'a' ) + 1;
+      hash = ( command[0] - 'a' ) + 1;
 
    for( social = social_index[hash]; social; social = social->next )
       if( !str_prefix( command, social->name ) )
@@ -603,7 +595,7 @@ SOCIALTYPE *find_social( const char *command )
    return NULL;
 }
 
-bool check_social( CHAR_DATA * ch, const char *command, const char *argument )
+bool check_social( CHAR_DATA * ch, char *command, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    CHAR_DATA *victim, *victim_next;
@@ -669,7 +661,7 @@ bool check_social( CHAR_DATA * ch, const char *command, const char *argument )
          else
          {
             set_char_color( AT_IGNORE, victim );
-            ch_printf( victim, "You attempt to ignore %s, but are unable to do so.\r\n", !can_see( victim, ch ) ? "Someone" : ch->name );
+            ch_printf( victim, "You attempt to ignore %s," " but are unable to do so.\r\n", ch->name );
          }
       }
    }
@@ -714,8 +706,8 @@ bool check_social( CHAR_DATA * ch, const char *command, const char *argument )
       act( AT_SOCIAL, social->char_found, ch, NULL, victim, TO_CHAR );
       act( AT_SOCIAL, social->vict_found, ch, NULL, victim, TO_VICT );
 
-      if( !IS_NPC( ch ) && IS_NPC( victim ) && !IS_AFFECTED( victim, AFF_CHARM ) && IS_AWAKE( victim ) && !victim->desc // This was just really annoying.. lemme do my own socials! -- Alty
-          && !HAS_PROG( victim->pIndexData, ACT_PROG ) )
+      if( !IS_NPC( ch ) && IS_NPC( victim )
+          && !IS_AFFECTED( victim, AFF_CHARM ) && IS_AWAKE( victim ) && !HAS_PROG( victim->pIndexData, ACT_PROG ) )
       {
          switch ( number_bits( 4 ) )
          {
@@ -780,7 +772,7 @@ bool check_social( CHAR_DATA * ch, const char *command, const char *argument )
 /*
  * Return true if an argument is completely numeric.
  */
-bool is_number( const char *arg )
+bool is_number( char *arg )
 {
    bool first = TRUE;
    if( *arg == '\0' )
@@ -804,23 +796,18 @@ bool is_number( const char *arg )
 /*
  * Given a string like 14.foo, return 14 and 'foo'
  */
-int number_argument( const char *argument, char *arg )
+int number_argument( char *argument, char *arg )
 {
-   const char *pdot;
+   char *pdot;
    int number;
 
    for( pdot = argument; *pdot != '\0'; pdot++ )
    {
       if( *pdot == '.' )
       {
-         char* numPortion = (char*) malloc(pdot-argument+1);
-         memcpy(numPortion, argument, pdot-argument);
-         numPortion[pdot-argument] = '\0';
-
-         number = atoi( numPortion );
-
-         free(numPortion);
-
+         *pdot = '\0';
+         number = atoi( argument );
+         *pdot = '.';
          strcpy( arg, pdot + 1 );
          return number;
       }
@@ -830,16 +817,11 @@ int number_argument( const char *argument, char *arg )
    return 1;
 }
 
-char *one_argument( char *argument, char *arg_first )
-{
-    return (char*) one_argument((const char*) argument, arg_first);
-}
-
 /*
  * Pick off one argument from a string and return the rest.
  * Understands quotes. No longer mangles case either. That used to be annoying.
  */
-const char *one_argument( const char *argument, char *arg_first )
+char *one_argument( char *argument, char *arg_first )
 {
    char cEnd;
    int count;
@@ -877,7 +859,7 @@ const char *one_argument( const char *argument, char *arg_first )
  * Understands quotes.  Delimiters = { ' ', '-' }
  * No longer mangles case either. That used to be annoying.
  */
-const char *one_argument2( const char *argument, char *arg_first )
+char *one_argument2( char *argument, char *arg_first )
 {
    char cEnd;
    short count;
@@ -916,7 +898,7 @@ const char *one_argument2( const char *argument, char *arg_first )
    return argument;
 }
 
-void do_timecmd( CHAR_DATA* ch, const char* argument)
+void do_timecmd( CHAR_DATA * ch, char *argument )
 {
    struct timeval sttime;
    struct timeval etime;

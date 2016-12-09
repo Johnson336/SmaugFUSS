@@ -56,9 +56,6 @@ const int CLIMATE_ALPINE      = 9;
 const int CLIMATE_ARCTIC      = 10;
 const int MAX_CLIMATE         = 11;
 
-// File that stores Weather Information 
-#define WEATHER_FILE "weathermap.dat"
-
 //So it can be utilized from other parts of the code
 extern struct WeatherCell	weatherMap[WEATHER_SIZE_X][WEATHER_SIZE_Y];
 extern struct WeatherCell	weatherDelta[WEATHER_SIZE_X][WEATHER_SIZE_Y];

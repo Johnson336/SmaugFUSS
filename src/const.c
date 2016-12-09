@@ -1,46 +1,44 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                           Mud constants module                           *
+ *			     Mud constants module			    *
  ****************************************************************************/
 
 #include <stdio.h>
 #include "mud.h"
 
-const char *const npc_race[MAX_NPC_RACE] = {
-   // Playable races - MAX_RACE in mud.h must be raised before more can be added after r9.
-   "human", "elf", "dwarf", "halfling", "pixie", "vampire", "half-ogre",       // 6 (start from 0)
-   "half-orc", "half-troll", "half-elf", "gith", "drow", "sea-elf",            // 12
-   "lizardman", "gnome", "r5", "r6", "r7", "r8", "r9",                         // 19
-
-   // NPCs only
-   "troll", "ant", "ape", "baboon", "bat", "bear", "bee",                      // 26
-   "beetle", "boar", "bugbear", "cat", "dog", "dragon", "ferret", "fly",       // 34
-   "gargoyle", "gelatin", "ghoul", "gnoll", "goblin", "golem",                 // 40
-   "gorgon", "harpy", "hobgoblin", "kobold", "locust",                         // 45
-   "lycanthrope", "minotaur", "mold", "mule", "neanderthal", "ooze", "orc",    // 52
-   "rat", "rustmonster", "shadow", "shapeshifter", "shrew", "shrieker",        // 58
-   "skeleton", "slime", "snake", "spider", "stirge", "thoul", "troglodyte",    // 65
-   "undead", "wight", "wolf", "worm", "zombie", "bovine", "canine", "feline",  // 73
-   "porcine", "mammal", "rodent", "avis", "reptile", "amphibian", "fish",      // 80
-   "crustacean", "insect", "spirit", "magical", "horse", "animal", "humanoid", // 87
-   "monster", "god", "???"                                                     // 90
+char *const npc_race[MAX_NPC_RACE] = {
+   "human", "elf", "dwarf", "halfling", "pixie", "vampire", "half-ogre",
+   "half-orc", "half-troll", "half-elf", "gith", "drow", "sea-elf",
+   "lizardman", "gnome", "r5", "r6", "r7", "r8", "troll",
+   "ant", "ape", "baboon", "bat", "bear", "bee",
+   "beetle", "boar", "bugbear", "cat", "dog", "dragon", "ferret", "fly",
+   "gargoyle", "gelatin", "ghoul", "gnoll", "gnome", "goblin", "golem",
+   "gorgon", "harpy", "hobgoblin", "kobold", "lizardman", "locust",
+   "lycanthrope", "minotaur", "mold", "mule", "neanderthal", "ooze", "orc",
+   "rat", "rustmonster", "shadow", "shapeshifter", "shrew", "shrieker",
+   "skeleton", "slime", "snake", "spider", "stirge", "thoul", "troglodyte",
+   "undead", "wight", "wolf", "worm", "zombie", "bovine", "canine", "feline",
+   "porcine", "mammal", "rodent", "avis", "reptile", "amphibian", "fish",
+   "crustacean", "insect", "spirit", "magical", "horse", "animal", "humanoid",
+   "monster", "god"
 };
 
-const char *const npc_class[MAX_NPC_CLASS] = {
+
+char *const npc_class[MAX_NPC_CLASS] = {
    "mage", "cleric", "thief", "warrior", "vampire", "druid", "ranger",
-   "augurer", "paladin", "nephandi", "savage", "pc11", "pc12", "pc13",
+   "augurer", "paladin", "nephandi", "savage", "pirate", "pc12", "pc13",
    "pc14", "pc15", "pc16", "pc17", "pc18", "pc19",
    "baker", "butcher", "blacksmith", "mayor", "king", "queen"
 };
@@ -77,6 +75,8 @@ const struct str_app_type str_app[26] = {
    {10, 12, 999, 60} /* 25   */
 };
 
+
+
 const struct int_app_type int_app[26] = {
    {3},  /*  0 */
    {5},  /*  1 */
@@ -105,6 +105,8 @@ const struct int_app_type int_app[26] = {
    {85},
    {99}  /* 25 */
 };
+
+
 
 const struct wis_app_type wis_app[26] = {
    {0},  /*  0 */
@@ -135,6 +137,8 @@ const struct wis_app_type wis_app[26] = {
    {7}   /* 25 */
 };
 
+
+
 const struct dex_app_type dex_app[26] = {
    {60}, /* 0 */
    {50}, /* 1 */
@@ -164,6 +168,8 @@ const struct dex_app_type dex_app[26] = {
    {-120}   /* 25 */
 };
 
+
+
 const struct con_app_type con_app[26] = {
    {-4, 20},   /*  0 */
    {-3, 25},   /*  1 */
@@ -192,6 +198,7 @@ const struct con_app_type con_app[26] = {
    {7, 99},
    {8, 99}  /* 25 */
 };
+
 
 const struct cha_app_type cha_app[26] = {
    {-60},   /* 0 */
@@ -252,7 +259,36 @@ const struct lck_app_type lck_app[26] = {
    {-120}   /* 25 */
 };
 
-const char *const attack_table[18] = {
+
+/*
+ * Liquid properties.
+ * Used in #OBJECT section of area file.
+ */
+const struct liq_type liq_table[LIQ_MAX] = {
+   {"water", "clear", {0, 1, 10}},  /*  0 */
+   {"beer", "amber", {3, 2, 5}},
+   {"wine", "rose", {5, 2, 5}},
+   {"ale", "brown", {2, 2, 5}},
+   {"dark ale", "dark", {1, 2, 5}},
+
+   {"whisky", "golden", {6, 1, 4}}, /*  5 */
+   {"lemonade", "pink", {0, 1, 8}},
+   {"firebreather", "boiling", {10, 0, 0}},
+   {"local specialty", "everclear", {3, 3, 3}},
+   {"slime mold juice", "green", {0, 4, -8}},
+
+   {"milk", "white", {0, 3, 6}}, /* 10 */
+   {"tea", "tan", {0, 1, 6}},
+   {"coffee", "black", {0, 1, 6}},
+   {"blood", "red", {0, 2, -1}},
+   {"salt water", "clear", {0, 1, -2}},
+
+   {"cola", "cherry", {0, 1, 5}},   /* 15 */
+   {"mead", "honey color", {4, 2, 5}}, /* 16 */
+   {"grog", "thick brown", {3, 2, 5}}  /* 17 */
+};
+
+char *const attack_table[18] = {
    "hit",
    "slice", "stab", "slash", "whip", "claw",
    "blast", "pound", "crush", "grep", "bite",
@@ -260,14 +296,14 @@ const char *const attack_table[18] = {
    "stone", "pea"
 };
 
-const char *s_blade_messages[24] = {
+char *s_blade_messages[24] = {
    "miss", "barely scratch", "scratch", "nick", "cut", "hit", "tear",
    "rip", "gash", "lacerate", "hack", "maul", "rend", "decimate",
    "_mangle_", "_devastate_", "_cleave_", "_butcher_", "DISEMBOWEL",
    "DISFIGURE", "GUT", "EVISCERATE", "* SLAUGHTER *", "*** ANNIHILATE ***"
 };
 
-const char *p_blade_messages[24] = {
+char *p_blade_messages[24] = {
    "misses", "barely scratches", "scratches", "nicks", "cuts", "hits",
    "tears", "rips", "gashes", "lacerates", "hacks", "mauls", "rends",
    "decimates", "_mangles_", "_devastates_", "_cleaves_", "_butchers_",
@@ -275,14 +311,14 @@ const char *p_blade_messages[24] = {
    "*** ANNIHILATES ***"
 };
 
-const char *s_blunt_messages[24] = {
+char *s_blunt_messages[24] = {
    "miss", "barely scuff", "scuff", "pelt", "bruise", "strike", "thrash",
    "batter", "flog", "pummel", "smash", "maul", "bludgeon", "decimate",
    "_shatter_", "_devastate_", "_maim_", "_cripple_", "MUTILATE", "DISFIGURE",
    "MASSACRE", "PULVERIZE", "* OBLITERATE *", "*** ANNIHILATE ***"
 };
 
-const char *p_blunt_messages[24] = {
+char *p_blunt_messages[24] = {
    "misses", "barely scuffs", "scuffs", "pelts", "bruises", "strikes",
    "thrashes", "batters", "flogs", "pummels", "smashes", "mauls",
    "bludgeons", "decimates", "_shatters_", "_devastates_", "_maims_",
@@ -290,7 +326,7 @@ const char *p_blunt_messages[24] = {
    "* OBLITERATES *", "*** ANNIHILATES ***"
 };
 
-const char *s_generic_messages[24] = {
+char *s_generic_messages[24] = {
    "miss", "brush", "scratch", "graze", "nick", "jolt", "wound",
    "injure", "hit", "jar", "thrash", "maul", "decimate", "_traumatize_",
    "_devastate_", "_maim_", "_demolish_", "MUTILATE", "MASSACRE",
@@ -298,7 +334,7 @@ const char *s_generic_messages[24] = {
    "**** SMITE ****"
 };
 
-const char *p_generic_messages[24] = {
+char *p_generic_messages[24] = {
    "misses", "brushes", "scratches", "grazes", "nicks", "jolts", "wounds",
    "injures", "hits", "jars", "thrashes", "mauls", "decimates", "_traumatizes_",
    "_devastates_", "_maims_", "_demolishes_", "MUTILATES", "MASSACRES",
@@ -306,7 +342,7 @@ const char *p_generic_messages[24] = {
    "**** SMITES ****"
 };
 
-const char **const s_message_table[18] = {
+char **const s_message_table[18] = {
    s_generic_messages,  /* hit */
    s_blade_messages, /* slice */
    s_blade_messages, /* stab */
@@ -327,7 +363,7 @@ const char **const s_message_table[18] = {
    s_generic_messages   /* pea */
 };
 
-const char **const p_message_table[18] = {
+char **const p_message_table[18] = {
    p_generic_messages,  /* hit */
    p_blade_messages, /* slice */
    p_blade_messages, /* stab */
@@ -349,7 +385,7 @@ const char **const p_message_table[18] = {
 };
 
 /* Weather constants - FB */
-const char *const temp_settings[MAX_CLIMATE] = {
+char *const temp_settings[MAX_CLIMATE] = {
    "cold",
    "cool",
    "normal",
@@ -357,7 +393,7 @@ const char *const temp_settings[MAX_CLIMATE] = {
    "hot",
 };
 
-const char *const precip_settings[MAX_CLIMATE] = {
+char *const precip_settings[MAX_CLIMATE] = {
    "arid",
    "dry",
    "normal",
@@ -365,7 +401,7 @@ const char *const precip_settings[MAX_CLIMATE] = {
    "wet",
 };
 
-const char *const wind_settings[MAX_CLIMATE] = {
+char *const wind_settings[MAX_CLIMATE] = {
    "still",
    "calm",
    "normal",
@@ -373,7 +409,7 @@ const char *const wind_settings[MAX_CLIMATE] = {
    "windy",
 };
 
-const char *const preciptemp_msg[6][6] = {
+char *const preciptemp_msg[6][6] = {
    /*
     * precip = 0 
     */
@@ -436,7 +472,7 @@ const char *const preciptemp_msg[6][6] = {
     "A torrent of rain soaks the heated earth"}
 };
 
-const char *const windtemp_msg[6][6] = {
+char *const windtemp_msg[6][6] = {
    /*
     * wind = 0 
     */
@@ -499,13 +535,13 @@ const char *const windtemp_msg[6][6] = {
     "Monsoon winds tear the feverish air"}
 };
 
-const char *const precip_msg[3] = {
+char *const precip_msg[3] = {
    "there is not a cloud in the sky",
    "pristine white clouds are in the sky",
    "thick, grey clouds mask the sun"
 };
 
-const char *const wind_msg[6] = {
+char *const wind_msg[6] = {
    "there is not a breath of wind in the air",
    "a slight breeze stirs the air",
    "a breeze wafts through the area",

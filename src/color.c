@@ -9,12 +9,13 @@
  * Levi Beckerson (Whir), Michael Ward (Tarl), Erik Wolfe (Dwip),           *
  * Cameron Carroll (Cam), Cyberfox, Karangi, Rathian, Raine, and Adjani.    *
  * All Rights Reserved.                                                     *
+ * Registered with the United States Copyright Office. TX 5-877-286         *
  *                                                                          *
  * External contributions from Xorith, Quixadhal, Zarius, and many others.  *
  *                                                                          *
- * Original SMAUG 1.8b written by Thoric (Derek Snider) with Altrag,        *
+ * Original SMAUG 1.4a written by Thoric (Derek Snider) with Altrag,        *
  * Blodkai, Haus, Narn, Scryn, Swordbearer, Tricops, Gorog, Rennard,        *
- * Grishnakh, Fireblade, Edmond, Conran, and Nivek.                         *
+ * Grishnakh, Fireblade, and Nivek.                                         *
  *                                                                          *
  * Original MERC 2.1 code by Hatchet, Furey, and Kahn.                      *
  *                                                                          *
@@ -65,75 +66,90 @@
 #include <dirent.h>
 #include "mud.h"
 
-const char *const pc_displays[MAX_COLORS] = {
-   "black", "dred", "dgreen", "orange",        // 3
-   "dblue", "purple", "cyan", "grey",          // 7
-   "dgrey", "red", "green", "yellow",          // 11
-   "blue", "pink", "lblue", "white", "blink",  // 16
-   "bblack", "bdred", "bdgreen", "bdorange",   // 20
-   "bdblue", "bpurple", "bcyan", "bgrey",      // 24
-   "bdgrey", "bred", "bgreen", "byellow",      // 28
-   "bblue", "bpink", "blblue", "bwhite",       // 32
-   "plain", "action", "say", "chat",           // 36
-   "yells", "tell", "hit", "hitme",            // 40
-   "immortal", "hurt", "falling", "danger",    // 44
-   "magic", "consider", "report", "poison",    // 48
-   "social", "dying", "dead", "skill",         // 52
-   "carnage", "damage", "fleeing", "rmname",   // 56
-   "rmdesc", "objects", "people", "list",      // 60
-   "bye", "gold", "gtells", "note",            // 64
-   "hungry", "thirsty", "fire", "sober",       // 68
-   "wearoff", "exits", "score", "reset",       // 72
-   "log", "die_msg", "wartalk", "arena",       // 76
-   "muse", "think", "aflags", "who",           // 80
-   "racetalk", "ignore", "whisper", "divider", // 84
-   "morph", "shout", "rflags", "stype",        // 88
-   "aname", "auction", "score2", "score3",     // 92
-   "score4", "who2", "who3", "who4",           // 96
-   "intermud", "helpfiles", "who5", "score5",  // 100
-   "who6", "who7", "prac", "prac2",            // 104
-   "prac3", "prac4", "mxpprompt", "guildtalk", // 108
-   "board", "board2", "board3", "avtalk",      // 112
-   "music", "quest", "ask"                     // 115
+char *const pc_displays[MAX_COLORS] =
+{
+   "black",    "dred",      "dgreen",    "orange",
+   "dblue",    "purple",    "cyan",      "grey",
+   "dgrey",    "red",       "green",     "yellow",
+   "blue",     "pink",      "lblue",     "white",
+   "blink",    "bdred",     "bdgreen",   "bdorange",
+   "bdblue",   "bpurple",   "bcyan",     "bgrey",
+   "bdgrey",   "bred",      "bgreen",    "byellow",
+   "bblue",    "bpink",     "blblue",    "bwhite",
+   "plain",    "action",    "say",       "chat",
+   "yells",    "tell",      "hit",       "hitme",
+   "immortal", "hurt",      "falling",   "danger",
+   "magic",    "consider",  "report",    "poison",
+   "social",   "dying",     "dead",      "skill",
+   "carnage",  "damage",    "fleeing",   "rmname",
+   "rmdesc",   "objects",   "people",    "list",
+   "bye",      "gold",      "gtells",    "note",
+   "hungry",   "thirsty",   "fire",      "sober",
+   "wearoff",  "exits",     "score",     "reset",
+   "log",      "die_msg",   "wartalk",   "arena",
+   "muse",     "think",     "aflags",    "who",
+   "racetalk", "ignore",    "whisper",   "divider",
+   "morph",    "shout",     "rflags",    "stype",
+   "aname",    "auction",   "score2",    "score3",
+   "score4",   "who2",      "who3",      "who4",
+   "intermud", "helpfiles", "who5",      "score5",
+   "who6",     "who7",      "prac",      "prac2",
+   "prac3",    "prac4",     "mxpprompt", "guildtalk",
+   "board",    "board2",    "board3"
 };
 
 /* All defaults are set to Alsherok default scheme, if you don't 
 like it, change it around to suite your own needs - Samson */
-const short default_set[MAX_COLORS] = {
+const short default_set[MAX_COLORS] =
+{
    AT_BLACK, AT_BLOOD, AT_DGREEN, AT_ORANGE, /*  3 */
-   AT_DBLUE, AT_PURPLE, AT_CYAN, AT_GREY,   /*  7 */
-   AT_DGREY, AT_RED, AT_GREEN, AT_YELLOW,   /* 11 */
-   AT_BLUE, AT_PINK, AT_LBLUE, AT_WHITE, AT_BLINK, /* 16 */
-   AT_BLACK_BLINK, AT_BLOOD_BLINK, AT_DGREEN_BLINK, AT_ORANGE_BLINK, /* 20 */
-   AT_DBLUE_BLINK, AT_PURPLE_BLINK, AT_CYAN_BLINK, AT_GREY_BLINK, /* 24 */
-   AT_DGREY_BLINK, AT_RED_BLINK, AT_GREEN_BLINK, AT_YELLOW_BLINK, /* 28 */
-   AT_BLUE_BLINK, AT_PINK_BLINK, AT_LBLUE_BLINK, AT_WHITE_BLINK,  /* 32 */
-   AT_GREY, AT_GREY, AT_BLUE,             /* 35 */
-   AT_GREEN, AT_LBLUE, AT_WHITE, AT_GREY, /* 39 */
-   AT_GREY, AT_YELLOW, AT_GREY, AT_GREY,  /* 43 */
-   AT_GREY, AT_BLUE, AT_GREY, AT_GREY,    /* 47 */
-   AT_DGREEN, AT_CYAN, AT_GREY, AT_GREY,  /* 51 */
-   AT_BLUE, AT_GREY, AT_GREY, AT_GREY,    /* 55 */
-   AT_RED, AT_GREY, AT_BLUE, AT_PINK,     /* 59 */
-   AT_GREY, AT_GREY, AT_YELLOW, AT_GREY,  /* 63 */
-   AT_GREY, AT_ORANGE, AT_BLUE, AT_RED,   /* 67 */
-   AT_GREY, AT_GREY, AT_GREEN, AT_DGREEN, /* 71 */
-   AT_DGREEN, AT_ORANGE, AT_GREY, AT_RED, /* 75 */
-   AT_GREY, AT_DGREEN, AT_RED, AT_BLUE,   /* 79 */
-   AT_RED, AT_CYAN, AT_YELLOW, AT_PINK,   /* 83 */
-   AT_DGREEN, AT_PINK, AT_WHITE, AT_BLUE, /* 87 */
-   AT_BLUE, AT_BLUE, AT_GREEN, AT_GREY,   /* 91 */
-   AT_GREEN, AT_GREEN, AT_YELLOW, AT_DGREY,  /* 95 */
-   AT_GREEN, AT_PINK, AT_DGREEN, AT_CYAN, /* 99 */
-   AT_RED, AT_WHITE, AT_BLUE, AT_DGREEN,  /* 103 */
-   AT_CYAN, AT_BLOOD, AT_RED, AT_DGREEN,  /* 107 */
-   AT_GREEN, AT_GREY, AT_GREEN, AT_WHITE, /* 111 */
-   AT_GREEN, AT_GREEN, AT_GREEN, AT_GREEN /* 115 */
+   AT_DBLUE, AT_PURPLE, AT_CYAN, AT_GREY, /*  7 */
+   AT_DGREY, AT_RED, AT_GREEN, AT_YELLOW, /* 11 */
+   AT_BLUE, AT_PINK, AT_LBLUE, AT_WHITE,  /* 15 */
+   AT_BLACK_BLINK, AT_BLOOD_BLINK, AT_DGREEN_BLINK, AT_ORANGE_BLINK, /* 19 */
+   AT_DBLUE_BLINK, AT_PURPLE_BLINK, AT_CYAN_BLINK, AT_GREY_BLINK, /* 23 */
+   AT_DGREY_BLINK, AT_RED_BLINK, AT_GREEN_BLINK, AT_YELLOW_BLINK, /* 27 */
+   AT_BLUE_BLINK, AT_PINK_BLINK, AT_LBLUE_BLINK, AT_WHITE_BLINK, /* 31 */
+   AT_GREY, AT_GREY, AT_BLUE,   /* 34 */
+   AT_GREEN, AT_LBLUE, AT_WHITE, AT_GREY, /* 38 */
+   AT_GREY, AT_YELLOW, AT_GREY, AT_GREY,  /* 42 */
+   AT_GREY, AT_BLUE, AT_GREY, AT_GREY, /* 46 */
+   AT_DGREEN, AT_CYAN, AT_GREY, AT_GREY,  /* 50 */
+   AT_BLUE, AT_GREY, AT_GREY, AT_GREY, /* 54 */
+   AT_RED, AT_GREY, AT_BLUE, AT_PINK,  /* 58 */
+   AT_GREY, AT_GREY, AT_YELLOW, AT_GREY,  /* 62 */
+   AT_GREY, AT_ORANGE, AT_BLUE, AT_RED,   /* 66 */
+   AT_GREY, AT_GREY, AT_GREEN, AT_DGREEN, /* 70 */
+   AT_DGREEN, AT_ORANGE, AT_GREY, AT_RED, /* 74 */
+   AT_GREY, AT_DGREEN, AT_RED, AT_BLUE,   /* 78 */
+   AT_RED, AT_CYAN, AT_YELLOW, AT_PINK,   /* 82 */
+   AT_DGREEN, AT_PINK, AT_WHITE, AT_BLUE, /* 86 */
+   AT_BLUE, AT_BLUE, AT_GREEN, AT_GREY,   /* 90 */
+   AT_GREEN, AT_GREEN, AT_YELLOW, AT_DGREY,  /* 94 */
+   AT_GREEN, AT_PINK, AT_DGREEN, AT_CYAN, /* 98 */
+   AT_RED, AT_WHITE, AT_BLUE, AT_DGREEN,  /* 102 */
+   AT_CYAN, AT_BLOOD, AT_RED, AT_DGREEN,  /* 106 */
+   AT_GREEN, AT_GREY, AT_GREEN, AT_WHITE  /* 110 */
 };
 
-const char *const valid_color[] = {
-   "black", "dred", "dgreen", "orange", "dblue", "purple", "cyan", "grey",
-   "dgrey", "red", "green", "yellow", "blue", "pink", "lblue", "white", "\0"
+char *const valid_color[] = {
+   "black",
+   "dred",
+   "dgreen",
+   "orange",
+   "dblue",
+   "purple",
+   "cyan",
+   "grey",
+   "dgrey",
+   "red",
+   "green",
+   "yellow",
+   "blue",
+   "pink",
+   "lblue",
+   "white",
+   "\0"
 };
 
 void show_colorthemes( CHAR_DATA * ch )
@@ -156,7 +172,6 @@ void show_colorthemes( CHAR_DATA * ch )
          dentry = readdir( dp );
          continue;
       }
-
       if( dentry->d_name[0] != '.' )
       {
          ++count;
@@ -198,9 +213,9 @@ void show_colors( CHAR_DATA * ch )
 
    send_to_pager( "\r\n\r\n&W******************************[ COLOR TYPES ]******************************\r\n", ch );
 
-   for( count = 33; count < MAX_COLORS; ++count )
+   for( count = 32; count < MAX_COLORS; ++count )
    {
-      if( ( count % 8 ) == 0 && count != 33 )
+      if( ( count % 8 ) == 0 && count != 32 )
       {
          send_to_pager( "\r\n", ch );
       }
@@ -237,7 +252,6 @@ void reset_colors( CHAR_DATA * ch )
          memcpy( &ch->colors, &default_set, sizeof( default_set ) );
          return;
       }
-
       while( !feof( fp ) )
       {
          char *word = fread_word( fp );
@@ -247,7 +261,6 @@ void reset_colors( CHAR_DATA * ch )
             max_colors = UMIN( temp, MAX_COLORS );
             continue;
          }
-
          if( !str_cmp( word, "Colors" ) )
          {
             for( x = 0; x < max_colors; ++x )
@@ -255,7 +268,6 @@ void reset_colors( CHAR_DATA * ch )
             fread_to_eol( fp );
             continue;
          }
-
          if( !str_cmp( word, "End" ) )
          {
             fclose( fp );
@@ -268,10 +280,10 @@ void reset_colors( CHAR_DATA * ch )
       return;
    }
    else
-      log_printf( "%s: Attempting to reset NPC colors: %s", __func__, ch->short_descr );
+      log_printf( "%s: Attempting to reset NPC colors: %s", __FUNCTION__, ch->short_descr );
 }
 
-void do_color( CHAR_DATA* ch, const char* argument)
+void do_color( CHAR_DATA * ch, char *argument )
 {
    bool dMatch, cMatch;
    short count = 0, y = 0;
@@ -319,7 +331,6 @@ void do_color( CHAR_DATA* ch, const char* argument)
          ch_printf( ch, "Unable to write to color file %s\r\n", filename );
          return;
       }
-
       fprintf( fp, "%s", "#COLORTHEME\n" );
       fprintf( fp, "Name         %s~\n", argument );
       fprintf( fp, "MaxColors    %d\n", MAX_COLORS );
@@ -367,7 +378,6 @@ void do_color( CHAR_DATA* ch, const char* argument)
             max_colors = UMIN( temp, MAX_COLORS );
             continue;
          }
-
          if( !str_cmp( word, "Colors" ) )
          {
             for( x = 0; x < max_colors; ++x )
@@ -375,7 +385,6 @@ void do_color( CHAR_DATA* ch, const char* argument)
             fread_to_eol( fp );
             continue;
          }
-
          if( !str_cmp( word, "End" ) )
          {
             fclose( fp );
@@ -509,7 +518,7 @@ void do_color( CHAR_DATA* ch, const char* argument)
 
    argument = one_argument( argument, arg2 );
 
-   if( arg[0] == '\0' )
+   if( !arg || arg[0] == '\0' )
    {
       send_to_char( "Change which color type?\r\n", ch );
       return;
@@ -532,7 +541,7 @@ void do_color( CHAR_DATA* ch, const char* argument)
          }
       }
    }
-   else if( arg2[0] == '\0' )
+   else if( !arg || arg2[0] == '\0' )
       cMatch = FALSE;
    else
    {
@@ -627,7 +636,7 @@ void do_color( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-const char *color_str( short AType, CHAR_DATA * ch )
+char *color_str( short AType, CHAR_DATA * ch )
 {
    if( !ch )
    {
@@ -674,39 +683,39 @@ const char *color_str( short AType, CHAR_DATA * ch )
          return ( ANSI_WHITE );
 
          /*
-          * 17 thru 32 are for blinking colors 
+          * 16 thru 31 are for blinking colors 
           */
-      case 17:
+      case 16:
          return ( BLINK_BLACK );
-      case 18:
+      case 17:
          return ( BLINK_DRED );
-      case 19:
+      case 18:
          return ( BLINK_DGREEN );
-      case 20:
+      case 19:
          return ( BLINK_ORANGE );
-      case 21:
+      case 20:
          return ( BLINK_DBLUE );
-      case 22:
+      case 21:
          return ( BLINK_PURPLE );
-      case 23:
+      case 22:
          return ( BLINK_CYAN );
-      case 24:
+      case 23:
          return ( BLINK_GREY );
-      case 25:
+      case 24:
          return ( BLINK_DGREY );
-      case 26:
+      case 25:
          return ( BLINK_RED );
-      case 27:
+      case 26:
          return ( BLINK_GREEN );
-      case 28:
+      case 27:
          return ( BLINK_YELLOW );
-      case 29:
+      case 28:
          return ( BLINK_BLUE );
-      case 30:
+      case 29:
          return ( BLINK_PINK );
-      case 31:
+      case 30:
          return ( BLINK_LBLUE );
-      case 32:
+      case 31:
          return ( BLINK_WHITE );
 
       default:
@@ -715,7 +724,7 @@ const char *color_str( short AType, CHAR_DATA * ch )
 }
 
 /* Random Ansi Color Code -- Xorith */
-const char *random_ansi( short type )
+char *random_ansi( short type )
 {
    switch ( type )
    {
@@ -849,7 +858,7 @@ int colorcode( const char *src, char *dst, DESCRIPTOR_DATA * d, int dstlen, int 
 {
    CHAR_DATA *ch = NULL;
    bool ansi = FALSE;
-   const char *sympos = NULL;
+   char *sympos = NULL;
 
    /*
     * No descriptor, assume ANSI conversion can't be done. 
@@ -1363,7 +1372,7 @@ char *colorize( const char *txt, DESCRIPTOR_DATA * d )
 
    if( txt && *txt && d )
    {
-      const char *colstr;
+      char *colstr;
       const char *prevstr = txt;
       char colbuf[20];
       int ln;
@@ -1424,13 +1433,13 @@ void set_char_color( short AType, CHAR_DATA * ch )
    write_to_buffer( ch->desc, color_str( AType, ch ), 0 );
    if( !ch->desc )
    {
-      bug( "%s: NULL descriptor after WTB! CH: %s", __func__, ch->name ? ch->name : "Unknown?!?" );
+      bug( "set_char_color: NULL descriptor after WTB! CH: %s", ch->name ? ch->name : "Unknown?!?" );
       return;
    }
    ch->desc->pagecolor = ch->colors[AType];
 }
 
-void write_to_pager( DESCRIPTOR_DATA * d, const char *txt, size_t length )
+void write_to_pager( DESCRIPTOR_DATA * d, const char *txt, unsigned int length )
 {
    int pageroffset;  /* Pager fix by thoric */
 
@@ -1445,46 +1454,38 @@ void write_to_pager( DESCRIPTOR_DATA * d, const char *txt, size_t length )
       d->pagesize = MAX_STRING_LENGTH;
       CREATE( d->pagebuf, char, d->pagesize );
    }
-
    if( !d->pagepoint )
    {
       d->pagepoint = d->pagebuf;
       d->pagetop = 0;
       d->pagecmd = '\0';
    }
-
    if( d->pagetop == 0 && !d->fcommand )
    {
       d->pagebuf[0] = '\r';
       d->pagebuf[1] = '\n';
       d->pagetop = 2;
    }
-
    pageroffset = d->pagepoint - d->pagebuf;  /* pager fix (goofup fixed 08/21/97) */
    while( d->pagetop + length >= d->pagesize )
    {
-      if( d->pagesize > MAX_STRING_LENGTH * 24 )
+      if( d->pagesize > MAX_STRING_LENGTH * 16 )
       {
+         bug( "%s", "Pager overflow.  Ignoring.\r\n" );
          d->pagetop = 0;
          d->pagepoint = NULL;
          DISPOSE( d->pagebuf );
          d->pagesize = MAX_STRING_LENGTH;
-         // Move bug call here to avoid infinite loops.  Compliments of Daltorak -- Alty
-         bug( "Pager overflow (%s).  Ignoring.", d->character ? d->character->name : "???" );
          return;
       }
-
-      if( d->pagesize < 8 * MAX_STRING_LENGTH )
-         d->pagesize *= 2;
-      else
-         d->pagesize = 24 * MAX_STRING_LENGTH;
+      d->pagesize *= 2;
       RECREATE( d->pagebuf, char, d->pagesize );
    }
-
    d->pagepoint = d->pagebuf + pageroffset;  /* pager fix (goofup fixed 08/21/97) */
    strncpy( d->pagebuf + d->pagetop, txt, length );   /* Leave this one alone! BAD THINGS(TM) will happen if you don't! */
    d->pagetop += length;
    d->pagebuf[d->pagetop] = '\0';
+   return;
 }
 
 void set_pager_color( short AType, CHAR_DATA * ch )
@@ -1498,7 +1499,7 @@ void set_pager_color( short AType, CHAR_DATA * ch )
    write_to_pager( ch->desc, color_str( AType, ch ), 0 );
    if( !ch->desc )
    {
-      bug( "%s: NULL descriptor after WTP! CH: %s", __func__, ch->name ? ch->name : "Unknown?!?" );
+      bug( "set_pager_color: NULL descriptor after WTP! CH: %s", ch->name ? ch->name : "Unknown?!?" );
       return;
    }
    ch->desc->pagecolor = ch->colors[AType];
@@ -1509,7 +1510,7 @@ void send_to_desc_color( const char *txt, DESCRIPTOR_DATA * d )
 {
    if( !d )
    {
-      bug( "%s: NULL *d", __func__ );
+      bug( "%s: NULL *d", __FUNCTION__ );
       return;
    }
 
@@ -1517,6 +1518,7 @@ void send_to_desc_color( const char *txt, DESCRIPTOR_DATA * d )
       return;
 
    write_to_buffer( d, colorize( txt, d ), 0 );
+   return;
 }
 
 /*
@@ -1526,19 +1528,20 @@ void send_to_char( const char *txt, CHAR_DATA * ch )
 {
    if( !ch )
    {
-      bug( "%s: NULL ch!", __func__ );
+      bug( "%s", "send_to_char: NULL ch!" );
       return;
    }
 
    if( txt && ch->desc )
       send_to_desc_color( txt, ch->desc );
+   return;
 }
 
 void send_to_pager( const char *txt, CHAR_DATA * ch )
 {
    if( !ch )
    {
-      bug( "%s: NULL ch!", __func__ );
+      bug( "%s", "send_to_pager: NULL ch!" );
       return;
    }
 
@@ -1558,9 +1561,10 @@ void send_to_pager( const char *txt, CHAR_DATA * ch )
             write_to_pager( ch->desc, colorize( txt, ch->desc ), 0 );
       }
    }
+   return;
 }
 
-void ch_printf( CHAR_DATA * ch, const char *fmt, ... )
+void ch_printf( CHAR_DATA *ch, char *fmt, ... )
 {
    char buf[MAX_STRING_LENGTH * 2];
    va_list args;
@@ -1572,7 +1576,7 @@ void ch_printf( CHAR_DATA * ch, const char *fmt, ... )
    send_to_char( buf, ch );
 }
 
-void pager_printf( CHAR_DATA * ch, const char *fmt, ... )
+void pager_printf( CHAR_DATA *ch, char *fmt, ... )
 {
    char buf[MAX_STRING_LENGTH * 2];
    va_list args;
@@ -1588,7 +1592,7 @@ void pager_printf( CHAR_DATA * ch, const char *fmt, ... )
  * The primary output interface for formatted output.
  */
 /* Major overhaul. -- Alty */
-void ch_printf_color( CHAR_DATA * ch, const char *fmt, ... )
+void ch_printf_color( CHAR_DATA *ch, char *fmt, ... )
 {
    char buf[MAX_STRING_LENGTH * 2];
    va_list args;
@@ -1600,7 +1604,7 @@ void ch_printf_color( CHAR_DATA * ch, const char *fmt, ... )
    send_to_char( buf, ch );
 }
 
-void pager_printf_color( CHAR_DATA * ch, const char *fmt, ... )
+void pager_printf_color( CHAR_DATA *ch, char *fmt, ... )
 {
    char buf[MAX_STRING_LENGTH * 2];
    va_list args;
@@ -1612,9 +1616,9 @@ void pager_printf_color( CHAR_DATA * ch, const char *fmt, ... )
    send_to_pager( buf, ch );
 }
 
-void paint( short AType, CHAR_DATA * ch, const char *fmt, ... )
+void paint( short AType, CHAR_DATA *ch, const char *fmt, ... )
 {
-   char buf[MAX_STRING_LENGTH * 2]; /* better safe than sorry */
+   char buf[MAX_STRING_LENGTH * 2];   /* better safe than sorry */
    va_list args;
 
    va_start( args, fmt );
@@ -1630,10 +1634,12 @@ void paint( short AType, CHAR_DATA * ch, const char *fmt, ... )
 void send_to_char_color( const char *txt, CHAR_DATA * ch )
 {
    send_to_char( txt, ch );
+   return;
 }
 
 /* Wrapper function for any "legacy" code that may be installed later */
 void send_to_pager_color( const char *txt, CHAR_DATA * ch )
 {
    send_to_pager( txt, ch );
+   return;
 }

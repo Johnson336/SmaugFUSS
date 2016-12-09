@@ -1,18 +1,13 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
- * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
- * Chastain, Michael Quan, and Mitchell Tse.                                *
- * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
- * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
- * ------------------------------------------------------------------------ *
- *                         Tracking/hunting module                          *
+ *			 Tracking/hunting module			    *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -21,7 +16,7 @@
 #define BFS_ERROR	   -1
 #define BFS_ALREADY_THERE  -2
 #define BFS_NO_PATH	   -3
-#define BFS_MARK ROOM_TRACK
+#define BFS_MARK    536870912
 
 #define TRACK_THROUGH_DOORS
 
@@ -43,9 +38,9 @@ struct bfs_queue_struct
 static BFS_DATA *queue_head = NULL, *queue_tail = NULL, *room_queue = NULL;
 
 /* Utility macros */
-#define MARK(room)	(xSET_BIT(	(room)->room_flags, BFS_MARK) )
-#define UNMARK(room)	(xREMOVE_BIT(	(room)->room_flags, BFS_MARK) )
-#define IS_MARKED(room)	(xIS_SET(	(room)->room_flags, BFS_MARK) )
+#define MARK(room)	(SET_BIT(	(room)->room_flags, BFS_MARK) )
+#define UNMARK(room)	(REMOVE_BIT(	(room)->room_flags, BFS_MARK) )
+#define IS_MARKED(room)	(IS_SET(	(room)->room_flags, BFS_MARK) )
 
 bool valid_edge( EXIT_DATA * pexit )
 {
@@ -188,7 +183,7 @@ int find_first_step( ROOM_INDEX_DATA * src, ROOM_INDEX_DATA * target, int maxdis
 }
 
 
-void do_track( CHAR_DATA* ch, const char* argument)
+void do_track( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *vict;
    char arg[MAX_INPUT_LENGTH];
@@ -288,7 +283,7 @@ void found_prey( CHAR_DATA * ch, CHAR_DATA * victim )
       return;
    }
 
-   if( xIS_SET( ch->in_room->room_flags, ROOM_SAFE ) )
+   if( IS_SET( ch->in_room->room_flags, ROOM_SAFE ) )
    {
       if( number_percent(  ) < 90 )
          return;

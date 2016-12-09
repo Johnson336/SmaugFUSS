@@ -1,0 +1,99 @@
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[*****] [*****] FILE: gods.are LINE: 61
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 62
+[*****] [*****] FILE: gods.are LINE: 63
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 64
+[*****] [*****] FILE: gods.are LINE: 65
+[*****] [*****] FILE: gods.are LINE: 65
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[21001] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[21000] Admin: Shutdown by Admin.
+[21000] Admin: Shutdown by Admin.
+[ 1200] Admin: Shutdown by Admin.
+[*****] Äž˜¿Àc~
+[*****] Ô7£¿Às	~
+[*****] t±½¿ØO	~
+[*****] 4[Ù¿ØÓ	~
+[*****] [*****] BUG: Fread_char: unknown spell.
+[*****] [*****] BUG: Fread_char: unknown skill.
+[*****] [*****] BUG: Fread_char: unknown weapon.

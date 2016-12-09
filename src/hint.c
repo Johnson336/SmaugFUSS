@@ -127,7 +127,7 @@ void write_hint( void )
    }
 }
 
-void do_hintedit( CHAR_DATA* ch, const char* argument)
+void do_hintedit( CHAR_DATA* ch, char* argument)
 {
    char arg[MAX_STRING_LENGTH];
    char arg2[MAX_STRING_LENGTH];

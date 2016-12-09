@@ -10,9 +10,9 @@
  * Cameron Carroll (Cam), Cyberfox, Karangi, Rathian, Raine, and Adjani.    *
  * All Rights Reserved.                                                     *
  *                                                                          *
- * Original SMAUG 1.8b written by Thoric (Derek Snider) with Altrag,        *
+ * Original SMAUG 1.4a written by Thoric (Derek Snider) with Altrag,        *
  * Blodkai, Haus, Narn, Scryn, Swordbearer, Tricops, Gorog, Rennard,        *
- * Grishnakh, Fireblade, Edmond, Conran, and Nivek.                         *
+ * Grishnakh, Fireblade, and Nivek.                                         *
  *                                                                          *
  * Original MERC 2.1 code by Hatchet, Furey, and Kahn.                      *
  *                                                                          *
@@ -26,11 +26,6 @@
 #define CH(d)			((d)->original ? (d)->original : (d)->character)
 #endif /* 
         */
-
-#define HOTBOOT_FILE SYSTEM_DIR "copyover.dat"  /* for hotboots */
-#define EXE_FILE "../src/smaug"
-#define HOTBOOT_DIR "../hotboot/"   /* For storing objects across hotboots */
-#define MOB_FILE	"mobs.dat"  /* For storing mobs across hotboots */
 
 /* warmboot code */
 void hotboot_recover( void );

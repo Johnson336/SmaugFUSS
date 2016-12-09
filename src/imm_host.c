@@ -1,11 +1,11 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
@@ -69,7 +69,7 @@ int load_imm_host(  )
 
       if( !fMatch )
       {
-         bug( "%s: no match: %s", __func__, word );
+         bug( "%s: no match: %s", __FUNCTION__, word );
          fread_to_eol( fp );
       }
    }
@@ -132,13 +132,13 @@ int fread_imm_host( FILE * fp, IMMORTAL_HOST * data )
       }
       if( !fMatch )
       {
-         bug( "%s: no match: %s", __func__, word );
+         bug( "%s: no match: %s", __FUNCTION__, word );
          fread_to_eol( fp );
       }
    }
 }
 
-bool check_immortal_domain( CHAR_DATA * ch, const char *host )
+bool check_immortal_domain( CHAR_DATA * ch, char *host )
 {
    bool found = FALSE;
    IMMORTAL_HOST *temp;
@@ -178,7 +178,7 @@ bool check_immortal_domain( CHAR_DATA * ch, const char *host )
       return FALSE;
 }
 
-void do_add_imm_host( CHAR_DATA* ch, const char* argument)
+void do_add_imm_host( CHAR_DATA * ch, char *argument )
 {
    char type[MAX_INPUT_LENGTH];
    char arg1[MAX_INPUT_LENGTH];

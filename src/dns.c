@@ -5,17 +5,12 @@
  *                /-----\  |      | \  |  v  | |     | |  /                 *
  *               /       \ |      |  \ |     | +-----+ +-/                  *
  ****************************************************************************
- * AFKMud Copyright 1997-2007 by Roger Libiez (Samson),                     *
- * Levi Beckerson (Whir), Michael Ward (Tarl), Erik Wolfe (Dwip),           *
- * Cameron Carroll (Cam), Cyberfox, Karangi, Rathian, Raine,                *
- * Xorith, and Adjani.                                                      *
- * All Rights Reserved.                                                     *
+ * AFKMud Copyright 1997-2002 Alsherok. Contributors: Samson, Dwip, Whir,   *
+ * Cyberfox, Karangi, Rathian, Cam, Raine, and Tarl.                        *
  *                                                                          *
- * External contributions from Remcon, Quixadhal, Zarius, and many others.  *
- *                                                                          *
- * Original SMAUG 1.8b written by Thoric (Derek Snider) with Altrag,        *
+ * Original SMAUG 1.4a written by Thoric (Derek Snider) with Altrag,        *
  * Blodkai, Haus, Narn, Scryn, Swordbearer, Tricops, Gorog, Rennard,        *
- * Grishnakh, Fireblade, Edmond, Conran, and Nivek.                         *
+ * Grishnakh, Fireblade, and Nivek.                                         *
  *                                                                          *
  * Original MERC 2.1 code by Hatchet, Furey, and Kahn.                      *
  *                                                                          *
@@ -60,15 +55,17 @@ void prune_dns( void )
       }
    }
    save_dns(  );
+   return;
 }
 
 void check_dns( void )
 {
    if( current_time >= new_boot_time_t )
       prune_dns(  );
+   return;
 }
 
-void add_dns( const char *dhost, const char *address )
+void add_dns( char *dhost, char *address )
 {
    DNS_DATA *cache;
 
@@ -79,6 +76,7 @@ void add_dns( const char *dhost, const char *address )
    LINK( cache, first_cache, last_cache, next, prev );
 
    save_dns(  );
+   return;
 }
 
 char *in_dns_cache( char *ip )
@@ -98,6 +96,18 @@ char *in_dns_cache( char *ip )
    }
    return dnsbuf;
 }
+
+#if defined(KEY)
+#undef KEY
+#endif
+
+#define KEY( literal, field, value )					\
+				if ( !str_cmp( word, literal ) )	\
+				{					\
+				      field = value;			\
+				      fMatch = TRUE;			\
+				      break;				\
+				}
 
 void fread_dns( DNS_DATA * cache, FILE * fp )
 {
@@ -172,7 +182,7 @@ void load_dns( void )
 
          if( letter != '#' )
          {
-            bug( "%s: # not found.", __func__ );
+            bug( "%s: # not found.", __FUNCTION__ );
             break;
          }
 
@@ -188,7 +198,7 @@ void load_dns( void )
             break;
          else
          {
-            bug( "%s: bad section: %s.", __func__, word );
+            bug( "%s: bad section: %s.", __FUNCTION__, word );
             continue;
          }
       }
@@ -196,6 +206,7 @@ void load_dns( void )
       fp = NULL;
    }
    prune_dns(  ); /* Clean out entries beyond 14 days */
+   return;
 }
 
 void save_dns( void )
@@ -208,7 +219,7 @@ void save_dns( void )
 
    if( !( fp = fopen( filename, "w" ) ) )
    {
-      bug( "%s: fopen", __func__ );
+      bug( "%s: fopen", __FUNCTION__ );
       perror( filename );
    }
    else
@@ -225,6 +236,7 @@ void save_dns( void )
       fclose( fp );
       fp = NULL;
    }
+   return;
 }
 
 /* DNS Resolver code by Trax of Forever's End */
@@ -243,7 +255,7 @@ bool read_from_dns( int fd, char *buffer )
    iStart = strlen( inbuf );
    if( iStart >= sizeof( inbuf ) - 10 )
    {
-      bug( "%s: DNS input overflow!!!", __func__ );
+      bug( "%s: DNS input overflow!!!", __FUNCTION__ );
       return FALSE;
    }
 
@@ -321,6 +333,7 @@ bool read_from_dns( int fd, char *buffer )
 void process_dns( DESCRIPTOR_DATA * d )
 {
    char address[MAX_INPUT_LENGTH];
+   int status;
 
    address[0] = '\0';
 
@@ -342,6 +355,21 @@ void process_dns( DESCRIPTOR_DATA * d )
       close( d->ifd );
       d->ifd = -1;
    }
+
+   /*
+    * we don't have to check here, 
+    * cos the child is probably dead already. (but out of safety we do)
+    * 
+    * (later) I found this not to be true. The call to waitpid( ) is
+    * necessary, because otherwise the child processes become zombie
+    * and keep lingering around... The waitpid( ) removes them.
+    */
+   if( d->ipid != -1 )
+   {
+      waitpid( d->ipid, &status, 0 );
+      d->ipid = -1;
+   }
+   return;
 }
 
 /* DNS Resolver hook. Code written by Trax of Forever's End */
@@ -393,7 +421,7 @@ void resolve_dns( DESCRIPTOR_DATA * d, long ip )
       /*
        * Still here --> hmm. An error. 
        */
-      bug( "%s: Exec failed; Closing child.", __func__ );
+      bug( "%s: Exec failed; Closing child.", __FUNCTION__ );
       d->ifd = -1;
       d->ipid = -1;
       exit( 0 );
@@ -409,7 +437,7 @@ void resolve_dns( DESCRIPTOR_DATA * d, long ip )
    }
 }
 
-void do_cache( CHAR_DATA* ch, const char* argument)
+void do_cache( CHAR_DATA * ch, char *argument )
 {
    DNS_DATA *cache;
    int ip = 0;
@@ -423,4 +451,5 @@ void do_cache( CHAR_DATA* ch, const char* argument)
       ip++;
    }
    pager_printf( ch, "\r\n&W%d IPs in the cache.\r\n", ip );
+   return;
 }

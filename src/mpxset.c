@@ -1,11 +1,11 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
@@ -17,9 +17,20 @@
 #include <string.h>
 #include "mud.h"
 
+int get_npc_race args( ( char *type ) );
+int get_actflag args( ( char *flag ) );
+int get_risflag args( ( char *flag ) );
+int get_partflag args( ( char *flag ) );
+int get_attackflag args( ( char *flag ) );
+int get_defenseflag args( ( char *flag ) );
+int get_langflag args( ( char *flag ) );
+int get_langnum args( ( char *flag ) );
+int get_trigflag args( ( char *flag ) );
+
 extern int top_affect;
 
-void do_mpmset( CHAR_DATA* ch, const char* argument)
+
+void do_mpmset( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -555,7 +566,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
          return;
       }
 
-      if( arg3[0] == '\0' )
+      if( !arg3 || arg3[0] == '\0' )
       {
          STRFREE( victim->pcdata->deity_name );
          victim->pcdata->deity_name = STRALLOC( "" );
@@ -642,7 +653,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_actflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             progbug( "MpMset: Invalid flag", ch );
          else
          {
@@ -650,6 +661,10 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
                progbug( "MpMset: can't set prototype flag", ch );
             else if( value == ACT_IS_NPC )
                progbug( "MpMset: can't remove npc flag", ch );
+/*
+	     else if ( value == ACT_POLYMORPHED )
+		progbug("MpMset: can't change polymorphed flag", ch);
+*/
             else
                xTOGGLE_BIT( victim->act, value );
          }
@@ -674,7 +689,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_aflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             progbug( "MpMset: Invalid affected", ch );
          else
             xTOGGLE_BIT( victim->affected_by, value );
@@ -877,7 +892,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_defenseflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             progbug( "MpMset: Invalid defense", ch );
          else
             xTOGGLE_BIT( victim->defenses, value );
@@ -994,7 +1009,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_mposet( CHAR_DATA* ch, const char* argument)
+void do_mposet( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -1103,7 +1118,7 @@ void do_mposet( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_oflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             progbug( "MpOset: Invalid flag", ch );
          else
          {

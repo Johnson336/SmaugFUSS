@@ -1,11 +1,11 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
@@ -18,6 +18,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "mud.h"
+
+int get_risflag( char *flag );
+int get_pc_race( char *type );
+int get_pc_class( char *Class );
 
 #define MKEY( literal, field, value ) \
 	if( !str_cmp( word, literal ) ) \
@@ -41,7 +45,7 @@ void copy_morph( MORPH_DATA * morph, MORPH_DATA * temp );
  * Given the Morph's name, returns the pointer to the morph structure.
  * --Shaddai
  */
-MORPH_DATA *get_morph( const char *arg )
+MORPH_DATA *get_morph( char *arg )
 {
    MORPH_DATA *morph = NULL;
 
@@ -131,7 +135,7 @@ bool can_morph( CHAR_DATA * ch, MORPH_DATA * morph, bool is_cast )
 /*
  * Find a morph you can use -- Shaddai
  */
-MORPH_DATA *find_morph( CHAR_DATA * ch, const char *target, bool is_cast )
+MORPH_DATA *find_morph( CHAR_DATA * ch, char *target, bool is_cast )
 {
    MORPH_DATA *morph = NULL;
 
@@ -346,10 +350,10 @@ void save_morphs( void )
  *  as 1d2+10.  No boundry checks are in place yet on those, so care must
  *  be taken when using these.  --Shaddai
  */
-void do_morphset( CHAR_DATA* ch, const char* argument)
+void do_morphset( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH], arg2[MAX_INPUT_LENGTH], arg3[MAX_INPUT_LENGTH], buf[MAX_STRING_LENGTH];
-   const char *origarg = argument;
+   char *origarg = argument;
    int value;
    MORPH_DATA *morph = NULL;
 
@@ -374,7 +378,7 @@ void do_morphset( CHAR_DATA* ch, const char* argument)
       case SUB_MORPH_DESC:
          if( !ch->dest_buf )
          {
-            send_to_char( "Fatal error: report to www.smaugmuds.org\r\n", ch );
+            send_to_char( "Fatal error: report to www.smaugfuss.org\r\n", ch );
             bug( "%s", "do_morphset: sub_morph_desc: NULL ch->dest_buf" );
             ch->substate = SUB_NONE;
             return;
@@ -391,7 +395,7 @@ void do_morphset( CHAR_DATA* ch, const char* argument)
       case SUB_MORPH_HELP:
          if( !ch->dest_buf )
          {
-            send_to_char( "Fatal error: report to www.smaugmuds.org\r\n", ch );
+            send_to_char( "Fatal error: report to www.smaugfuss.org\r\n", ch );
             bug( "%s", "do_morphset: sub_morph_help: NULL ch->dest_buf" );
             ch->substate = SUB_NONE;
             return;
@@ -989,7 +993,7 @@ void do_morphset( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_aflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             ch_printf( ch, "Unknown flag: %s\r\n", arg3 );
          else
             xTOGGLE_BIT( morph->affected_by, value );
@@ -1006,7 +1010,7 @@ void do_morphset( CHAR_DATA* ch, const char* argument)
       {
          argument = one_argument( argument, arg3 );
          value = get_aflag( arg3 );
-         if( value < 0 || value >= MAX_BITS )
+         if( value < 0 || value > MAX_BITS )
             ch_printf( ch, "Unknown flag: %s\r\n", arg3 );
          else
             xTOGGLE_BIT( morph->no_affected_by, value );
@@ -1159,7 +1163,7 @@ void do_morphset( CHAR_DATA* ch, const char* argument)
  *  To see the description and help file, must use morphstat <morph> help
  *  Shaddai
  */
-void do_morphstat( CHAR_DATA* ch, const char* argument)
+void do_morphstat( CHAR_DATA * ch, char *argument )
 {
    MORPH_DATA *morph;
    char arg[MAX_INPUT_LENGTH];
@@ -1168,7 +1172,7 @@ void do_morphstat( CHAR_DATA* ch, const char* argument)
    set_pager_color( AT_CYAN, ch );
 
    argument = one_argument( argument, arg );
-   if( arg[0] == '\0' )
+   if( !arg || arg[0] == '\0' )
    {
       send_to_pager( "Morphstat what?\r\n", ch );
       return;
@@ -1576,7 +1580,7 @@ void do_unmorph_char( CHAR_DATA * ch )
 }
 
 /* Morph revert command ( God only knows why the Smaugers left this out ) - Samson 6-14-99 */
-void do_revert( CHAR_DATA* ch, const char* argument)
+void do_revert( CHAR_DATA * ch, char *argument )
 {
    if( !ch->morph )
    {
@@ -1734,7 +1738,7 @@ void morph_defaults( MORPH_DATA * morph )
 MORPH_DATA *fread_morph( FILE * fp )
 {
    MORPH_DATA *morph;
-   const char *arg;
+   char *arg;
    char temp[MAX_STRING_LENGTH];
    const char *word;
    int i;
@@ -1764,7 +1768,7 @@ MORPH_DATA *fread_morph( FILE * fp )
             KEY( "Charisma", morph->cha, fread_number( fp ) );
             if( !str_cmp( word, "Class" ) )
             {
-               arg = fread_flagstring( fp );
+               arg = fread_string( fp );
                while( arg[0] != '\0' )
                {
                   arg = one_argument( arg, temp );
@@ -2054,14 +2058,14 @@ void copy_morph( MORPH_DATA * morph, MORPH_DATA * temp )
 /*
  * Player command to create a new morph
  */
-void do_morphcreate( CHAR_DATA* ch, const char* argument)
+void do_morphcreate( CHAR_DATA * ch, char *argument )
 {
    MORPH_DATA *morph, *temp = NULL;
    char arg1[MAX_INPUT_LENGTH];
 
    argument = one_argument( argument, arg1 );
 
-   if( arg1[0] == '\0' )
+   if( !arg1 || arg1[0] == '\0' )
    {
       send_to_char( "Usage: morphcreate <name>\r\n", ch );
       send_to_char( "Usage: morphcreate <name/vnum> copy\r\n", ch );
@@ -2120,7 +2124,7 @@ void unmorph_all( MORPH_DATA * morph )
  * Player function to delete a morph. --Shaddai
  * NOTE Need to check all players and force them to unmorph first
  */
-void do_morphdestroy( CHAR_DATA* ch, const char* argument)
+void do_morphdestroy( CHAR_DATA * ch, char *argument )
 {
    MORPH_DATA *morph;
 
@@ -2271,7 +2275,6 @@ void fread_morph_data( CHAR_DATA * ch, FILE * fp )
    CREATE( morph, CHAR_MORPH, 1 );
    clear_char_morph( morph );
    ch->morph = morph;
-
    for( ;; )
    {
       word = feof( fp ) ? "End" : fread_word( fp );
@@ -2283,47 +2286,39 @@ void fread_morph_data( CHAR_DATA * ch, FILE * fp )
             KEY( "Affect", morph->affected_by, fread_bitvector( fp ) );
             KEY( "Armor", morph->ac, fread_number( fp ) );
             break;
-
          case 'C':
             KEY( "Charisma", morph->cha, fread_number( fp ) );
             KEY( "Constitution", morph->con, fread_number( fp ) );
             break;
-
          case 'D':
             KEY( "Damroll", morph->damroll, fread_number( fp ) );
             KEY( "Dexterity", morph->dex, fread_number( fp ) );
             KEY( "Dodge", morph->dodge, fread_number( fp ) );
             break;
-
          case 'E':
             if( !str_cmp( "End", word ) )
                return;
             break;
-
          case 'H':
             KEY( "Hit", morph->hit, fread_number( fp ) );
             KEY( "Hitroll", morph->hitroll, fread_number( fp ) );
             break;
-
          case 'I':
             KEY( "Immune", morph->immune, fread_number( fp ) );
             KEY( "Intelligence", morph->inte, fread_number( fp ) );
             break;
-
          case 'L':
             KEY( "Luck", morph->lck, fread_number( fp ) );
             break;
-
          case 'M':
             KEY( "Mana", morph->mana, fread_number( fp ) );
             KEY( "Move", morph->move, fread_number( fp ) );
             break;
-
          case 'N':
             if( !str_cmp( "Name", word ) )
             {
                if( morph->morph )
-                  if( str_cmp( morph->morph->name, fread_flagstring( fp ) ) )
+                  if( str_cmp( morph->morph->name, fread_string( fp ) ) )
                      bug( "Morph Name doesn't match vnum %d.", morph->morph->vnum );
                fMatch = TRUE;
                break;
@@ -2333,15 +2328,12 @@ void fread_morph_data( CHAR_DATA * ch, FILE * fp )
             KEY( "NoResistant", morph->no_resistant, fread_number( fp ) );
             KEY( "NoSuscept", morph->no_suscept, fread_number( fp ) );
             break;
-
          case 'P':
             KEY( "Parry", morph->parry, fread_number( fp ) );
             break;
-
          case 'R':
             KEY( "Resistant", morph->resistant, fread_number( fp ) );
             break;
-
          case 'S':
             KEY( "Save1", morph->saving_breath, fread_number( fp ) );
             KEY( "Save2", morph->saving_para_petri, fread_number( fp ) );
@@ -2351,12 +2343,10 @@ void fread_morph_data( CHAR_DATA * ch, FILE * fp )
             KEY( "Strength", morph->str, fread_number( fp ) );
             KEY( "Suscept", morph->suscept, fread_number( fp ) );
             break;
-
          case 'T':
             KEY( "Timer", morph->timer, fread_number( fp ) );
             KEY( "Tumble", morph->tumble, fread_number( fp ) );
             break;
-
          case 'V':
             if( !str_cmp( "Vnum", word ) )
             {
@@ -2365,24 +2355,23 @@ void fread_morph_data( CHAR_DATA * ch, FILE * fp )
                break;
             }
             break;
-
          case 'W':
             KEY( "Wisdom", morph->wis, fread_number( fp ) );
             break;
       }
-
       if( !fMatch )
       {
-         bug( "%s: no match: %s", __func__, word );
+         bug( "Fread_morph_data: no match: %s", word );
          fread_to_eol( fp );
       }
    }
+   return;
 }
 
 /* 
  * Following functions are for immortal testing purposes.
  */
-void do_imm_morph( CHAR_DATA* ch, const char* argument)
+void do_imm_morph( CHAR_DATA * ch, char *argument )
 {
    MORPH_DATA *morph;
    CHAR_DATA *victim = NULL;
@@ -2431,7 +2420,7 @@ void do_imm_morph( CHAR_DATA* ch, const char* argument)
 /*
  * This is just a wrapper.  --Shaddai
  */
-void do_imm_unmorph( CHAR_DATA* ch, const char* argument)
+void do_imm_unmorph( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *victim = NULL;
 
@@ -2454,7 +2443,7 @@ void do_imm_unmorph( CHAR_DATA* ch, const char* argument)
 }
 
 /* Added by Samson 6-13-99 - lists available polymorph forms */
-void do_morphlist( CHAR_DATA* ch, const char* argument)
+void do_morphlist( CHAR_DATA * ch, char *argument )
 {
    MORPH_DATA *morph;
 

@@ -95,8 +95,6 @@ struct mssp_info
    bool playerGuilds;
 };    
 
-#define MSSP_FILE SYSTEM_DIR "mssp.dat"
-
 #define MSSP_MINAGE  0
 #define MSSP_MAXAGE  21
 

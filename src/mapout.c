@@ -1,17 +1,18 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * v. 0.9: 6/19/95:  Converts an ascii map to rooms.                        *
  * v. 1.0: 7/05/95:  Read/write maps to .are files.  Efficient storage.     *
- *	             Room qualities based on map code. Can add & remove rms      *
- *	                from a map. (Somewhat) intelligent exit decisions.       *
+ *	             Room qualities based on map code. Can add & remove rms *
+ *	                from a map. (Somewhat) intelligent exit decisions.  *
  * v. 1.1: 7/11/95:  Various display options.  See comments over draw_map   *
+ *	                                                                    *
  ****************************************************************************/
 
 #include <stdio.h>
@@ -62,7 +63,7 @@ struct map_stuff
 };
 
 /* Lets make it check the map and make sure it uses [ ] instead of [] */
-const char *check_map( const char *str )
+char *check_map( char *str )
 {
    static char newstr[MAX_STRING_LENGTH];
    int i, j;
@@ -134,8 +135,7 @@ void map_stats( CHAR_DATA * ch, int *rooms, int *rows, int *cols )
 {
    int row, col, n;
    int leftmost, rightmost;
-   const char *l;
-   char c;
+   char *l, c;
 
    if( !ch->pnote )
    {
@@ -196,7 +196,7 @@ void map_stats( CHAR_DATA * ch, int *rooms, int *rows, int *cols )
    return;
 }
 
-void do_mapout( CHAR_DATA* ch, const char* argument)
+void do_mapout( CHAR_DATA * ch, char *argument )
 {
    char arg[MAX_INPUT_LENGTH];
    OBJ_DATA *map_obj;   /* an obj made with map as an ed */
@@ -260,7 +260,6 @@ void do_mapout( CHAR_DATA* ch, const char* argument)
       start_editing( ch, ch->pnote->text );
       return;
    }
-
    if( !str_cmp( arg, "clear" ) )
    {
       if( !ch->pnote )
@@ -278,7 +277,6 @@ void do_mapout( CHAR_DATA* ch, const char* argument)
       send_to_char( "Map cleared.\r\n", ch );
       return;
    }
-
    if( !str_cmp( arg, "show" ) )
    {
       if( !ch->pnote )
@@ -290,7 +288,6 @@ void do_mapout( CHAR_DATA* ch, const char* argument)
       do_mapout( ch, "stat" );
       return;
    }
-
    if( !str_cmp( arg, "create" ) )
    {
       if( !ch->pnote )
@@ -332,7 +329,6 @@ void do_mapout( CHAR_DATA* ch, const char* argument)
       send_to_char( "Ok.\r\n", ch );
       return;
    }
-
    send_to_char( "mapout write: create a map in edit buffer.\r\n", ch );
    send_to_char( "mapout stat: get information about a written, but not yet created map.\r\n", ch );
    send_to_char( "mapout clear: clear a written, but not yet created map.\r\n", ch );
@@ -355,7 +351,7 @@ int add_new_room_to_map( CHAR_DATA * ch, char code )
       {
          if( !( location = make_room( i, ch->pcdata->area ) ) )
          {
-            bug( "%s: make_room failed", __func__ );
+            bug( "%s: make_room failed", __FUNCTION__ );
             return -1;
          }
          /*
@@ -364,7 +360,7 @@ int add_new_room_to_map( CHAR_DATA * ch, char code )
          location->area = ch->pcdata->area;
          location->name = STRALLOC( "Newly Created Room" );
          location->description = STRALLOC( "Newly Created Room\r\n" );
-         xSET_BIT( location->room_flags, ROOM_PROTOTYPE );
+         location->room_flags = ROOM_PROTOTYPE;
          location->light = 0;
          if( code == 'I' )
             location->sector_type = SECT_INSIDE;
@@ -386,6 +382,8 @@ int add_new_room_to_map( CHAR_DATA * ch, char code )
             location->sector_type = SECT_AIR;
          else if( code == 'D' )
             location->sector_type = SECT_DESERT;
+         else if( code == 'U' )
+            location->sector_type = SECT_DUNNO;
          else if( code == 'O' )
             location->sector_type = SECT_OCEANFLOOR;
          else if( code == 'u' )
@@ -422,11 +420,10 @@ int num_rooms_avail( CHAR_DATA * ch )
 void map_to_rooms( CHAR_DATA * ch, MAP_INDEX_DATA * m_index )
 {
    struct map_stuff map[49][78]; /* size of edit buffer */
-   const char *newmap;
-   int row, col, i, n, x, y, tvnum, proto_vnum = 0;
+   char *newmap;
+   int row, col, i, n, x, y, tvnum, proto_vnum, leftmost, rightmost;
    int newx, newy;
-   const char *l;
-   char c;
+   char *l, c;
    ROOM_INDEX_DATA *newrm;
    MAP_INDEX_DATA *map_index = NULL, *tmp;
    EXIT_DATA *xit;   /* these are for exits */
@@ -434,7 +431,7 @@ void map_to_rooms( CHAR_DATA * ch, MAP_INDEX_DATA * m_index )
 
    if( !ch->pnote )
    {
-      bug( "%s: ch->pnote==NULL!", __func__ );
+      bug( "%s: ch->pnote==NULL!", __FUNCTION__ );
       return;
    }
 
@@ -447,6 +444,7 @@ void map_to_rooms( CHAR_DATA * ch, MAP_INDEX_DATA * m_index )
 
    n = 0;
    row = col = 0;
+   leftmost = rightmost = 0;
 
    /*
     * Check to make sure map_index exists.  
@@ -454,9 +452,7 @@ void map_to_rooms( CHAR_DATA * ch, MAP_INDEX_DATA * m_index )
     */
    if( !m_index )
    {
-      /*
-       * Make a new vnum 
-       */
+      /* Make a new vnum */
       for( i = ch->pcdata->area->low_r_vnum; i <= ch->pcdata->area->hi_r_vnum; i++ )
       {
          if( ( tmp = get_map_index( i ) ) == NULL )
