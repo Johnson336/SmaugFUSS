@@ -1,0 +1,1145 @@
+!! note: These changes are a bit more complex than your typical snippett.
+The reason for this is simple, the current clan system is located in all
+sorts of files, and a revamp of this size is a major overhaul.  Bear with
+me and make these changes though, and I assure you, you'll be happy with
+them.  If you need help, email to "gary@dharvest.com" and let me know
+what's happening, I'll do what I can to get you fixed up and running with
+the new clan system.  Just having the guild.dat file that can be changed
+without recompiling makes this all worth it.
+
+!! note: see the file "guild.dat.readme" for instructions on how to
+edit/modify this definition file.
+
+!! note: the functions: "is_clan", "is_same_clan" and "clan_lookup" have
+not been changed other than being moved, so no references to these need to
+be modified.  also, the "clan_table" references will continue to work as
+they are, you only need to make the changes as listed below.
+
+****[ MISC CHANGES ]*****************************************************
+
+!! backup! Dont make any of these changes until after you backup your
+source directory!
+
+!! put the "guild.c" file in your source directory.
+
+!! in "Makefile" add "guild.o" to the O_FILES section.
+
+!! add do_promote and save_guilds to interp.c and interp.h
+
+!! in "handler.c", find these two functions and delete them..
+   bool    is_clan         (CHAR_DATA *ch);
+   bool    is_same_clan    (CHAR_DATA *ch, CHAR_DATA *victim);
+
+   in "lookup.c" find and delete this function...
+   int     clan_lookup     (const char *name);
+
+   in "act_wiz.c" find and delete the "do_guild" function...
+
+
+****[ CHANGES FOR FILE: tables.c ]*****************************************
+
+(1)  delete the reference to clan_table. Yes, delete the
+     entire structure. it looks like this;
+
+     const struct clan_type clan_table[MAX_CLAN] = {
+
+(2)  in the "various flag tables" section, add
+
+const struct flag_type guild_flags[] =
+{
+   {    "Independent",		GUILD_INDEPENDENT,	TRUE 	},
+   {	"Modified",		GUILD_CHANGED,		FALSE	},
+   {	"Delete",		GUILD_DELETED,		TRUE	},
+   {    "Immortal",		GUILD_IMMORTAL,		TRUE	},
+   {	NULL,			0,			FALSE   }
+};
+
+
+***[ end of tables.c changes ]***
+
+
+
+****[ CHANGES FOR FILE: "db.c" ]*****************************************
+
+!! in the "local booting" section, add these next lines;
+
+/* load guild data file */
+void    load_guilds     args ( (void) ); /* guilds.c */
+
+
+!! in "boot_db", right before these lines;
+    /*
+     * Read in all the area files.
+     */
+
+   add these next lines;
+
+   /** Read in the clan/guild data file.
+     * this must be done before we call "load_rooms"
+     */
+    load_guilds();
+
+
+!! ****[ CHANGES FOR FILE: "merc.h" ]***************************************
+
+(1) at the bottom of the "Structure Types" section, add;
+typedef struct  clan_type               CLAN_DATA;
+
+(2) any logical place ( I put this above the site_ban structure ) add
+
+/** Clan flags
+ */
+#define GUILD_DELETED		A
+#define GUILD_CHANGED		B
+#define GUILD_INDEPENDENT 	C /* a "loner" guild */
+#define GUILD_IMMORTAL		E /* immortal only clan */
+
+
+(3) in the defines section of "merc.h" after this line:
+
+#define MAX_CLAN                   17
+  add this next line:
+#define MAX_RANK                    6 /* guild.c */
+
+(4) Somewhere in your /* RT personal flags */ section, add...
+#define PLR_MORTAL_LEADER       (free slot)
+  (of course, change 'free slot' to an open number...)
+
+(5) Add the following above the "mob_index_data" structure
+
+/* Prototypes for clan data */
+
+typedef struct guild_rank       rankdata;
+
+struct guild_rank
+{
+  char *rankname;               /* name of rank                         */
+  char *skillname;              /* name of skill earned at this rank    */
+};
+
+/* mortal leader rights are as follows;
+ ml[0] = can_guild
+ ml[1] = can_deguild
+ ml[2] = can_promote
+ ml[3] = can_demote
+*/
+
+struct clan_type
+{
+  long flags;                   /* flags for guild                      */
+  char *name;			/* name of guild                        */
+  char *who_name;		/* name sent for "who" command		*/
+  int room[3];                  /* hall/morgue/temple rooms             */
+  rankdata rank[MAX_RANK];	/* guilds rank system                   */
+  int ml[4];			/* mortal leader rights 		*/
+};
+
+(6) In "char_data", after the line:
+
+    sh_int              clan;
+ Add this next line:
+    sh_int              rank;   /* clan rank/status */
+
+(7) in the prototypes section, 
+
+    delete the existing prototypes to the functions; "is_clan", 
+    "is_same_clan" and "clan_lookup"
+
+(8) in the global prototypes section, add the following after fight.c,
+
+/* guild.c */
+struct	clan_type	clan_table[MAX_CLAN];
+char *  guild_bit_name  args( ( int guild_flags ) );
+bool    is_clan         args( (CHAR_DATA *ch) );
+bool    is_same_clan    args( (CHAR_DATA *ch, CHAR_DATA *victim) );
+int 	clan_lookup	args( (const char *name) );
+void 	do_guild	args( (CHAR_DATA *ch, char *argument ) );
+void	do_promote	args( (CHAR_DATA *ch, char *argument) );
+char 	*player_rank	args( (CHAR_DATA *ch) );
+char	*player_clan	args( (CHAR_DATA *ch) );
+bool	can_guild	args( (CHAR_DATA *ch) );
+bool    can_deguild     args( (CHAR_DATA *ch) );
+bool    can_promote     args( (CHAR_DATA *ch) );
+bool    can_demote      args( (CHAR_DATA *ch) );
+
+(9) under "olc.c" prototypes, add;
+CLAN_DATA *get_clan_data	args( ( int clan ) );
+
+(10) in the same section, after "olc.c" start a section for "olc_save.c"
+    and include; 
+void    save_guilds     args( ( CHAR_DATA *ch, char *argument ) );
+char 	*fwrite_flag	args( ( long flags, char buf[] ) );
+
+(11) in the area for "data files used by the server" add;
+#define DATA_DIR        "../data/"
+
+copy the included file "guild.dat" to this directory. 
+note: if you dont want to use a data directory, that's fine, just be sure
+you remove the reference to "DATA_DIR" in the included files. If you're
+unsure of how to safely remove those references, then create the data
+direcotry and include the above define. ;)
+
+
+(12) in the OLC macro section (look for IS_BUILDER) add;
+#define EDIT_GUILD(Ch, Clan)    ( Clan = Ch->desc->pEdit )
+
+
+
+!! ***[ CHANGES FOR FILE "fight.c"]**************************************
+
+(1) in function "raw_kill", IF you want to move pc corpses to their
+    clan morgue rooms, add the following to raw_kill, right after the 
+    lines;
+
+  make_corpse(victim)
+
+add;
+
+   /* GM, transfer the corpse to the clan morgue... */
+   if ( !IS_NPC(victim) && (is_clan(victim) &&
+        clan_table[victim->clan].room[1] != ROOM_VNUM_ALTAR &&
+        clan_table[victim->clan].room[1] > 0) )
+   {
+     OBJ_DATA *corpse;
+     ROOM_INDEX_DATA *morgue;
+
+     corpse = get_obj_list(victim, "corpse", victim->in_room->contents );
+     morgue = get_room_index(clan_table[victim->clan].room[1]);
+    
+     /* Bug fix provided by Mat Reda.  Thanks Matt! */
+     if (corpse != NULL && morgue != NULL)
+      {
+        obj_from_room(corpse);
+        obj_to_room(corpse, morgue);
+        if (victim->alignment > 0)
+         act("The Creator protects this one...",victim,NULL,NULL,TO_ROOM);
+        else
+         act("The Lord of the Grave claims his own!",victim,NULL,NULL,TO_ROOM);
+      }
+   }
+
+
+****[ CHANGES FOR FILE "save.c" ]**************************************
+!! in function "fwrite_char", after the line:
+
+    fprintf( fp,   "Clan %s~\n",clan_table[ch->clan].name);
+
+  add these lines;
+
+    if (ch->rank)
+    fprintf( fp,   "Rank %d\n", ch->rank                );
+
+!! in function "fread_char", after the line:
+
+            KEY( "Race",        ch->race, race_lookup(fread_string( fp )));
+  add this line;
+            KEY( "Rank",        ch->rank, fread_number( fp ) );
+
+
+****[ CHANGES FOR FILE "act_info.c" ]**********************************
+
+!! in function "do_score", right above the lines;
+
+    if ( get_trust( ch ) != ch->level )
+    {
+        sprintf( buf, "You are trusted at level %d.\n\r",
+            get_trust( ch ) );
+        send_to_char( buf, ch );
+    }
+
+  add these lines;
+
+    if ( is_clan(ch) )
+    {
+      sprintf( buf, "You are a %s of the %s\n\r",
+               player_rank(ch), player_clan(ch) );
+      send_to_char(buf, ch);
+    }
+
+!! (not mandatory at all) in functions do_whois and do_who
+
+(courtesy of Zanthras)
+
+ if you want to show the clan name (who_name) here, remove the line;
+ clan_table[wch->clan].who_name, and replace it with this;
+
+   (is_clan(wch) || IS_SET(clan_table[wch->clan].flags,GUILD_INDEPENDENT)) ?
+    "         " : clan_table[wch->clan].who_name,
+
+
+
+****[ CHANGES FOR FILE "act_wiz.c" ]************************************
+
+!! in the function "do_mstat", right above the lines;
+
+    if (IS_NPC(victim))
+    {
+        sprintf(buf,"Count: %d  Killed: %d\n\r",
+
+add these next lines;
+
+    if (is_clan(victim))
+    {
+       sprintf(buf, "Clan: %-25s  Rank: %s\n\r",
+               player_clan(victim), player_rank(victim));
+       send_to_char(buf, ch);
+    }
+
+****[ CHANGES FOR FILE: "act_comm.c"]***********************************
+
+!! in the function "do_clantalk", change the very last sprintf to:
+   (note, replace the `b and `w with your muds color codes)
+
+    sprintf( buf, "`b%s %s`w: %s\n\r", player_rank(ch),
+             ch->name, argument );
+
+!! change the very last "for" statement to:
+
+    for ( d = descriptor_list; d != NULL; d = d->next )
+    {
+        if ( d->connected == CON_PLAYING &&
+             is_same_clan(ch,d->character) &&
+             !IS_SET(d->character->comm,COMM_NOCLAN) &&
+             !IS_SET(d->character->comm,COMM_QUIET) )
+        {
+            send_to_char(buf, d->character);
+        }
+    }
+
+****[ CHANGES FOR FILE: "magic.c" ]************************************
+
+in function "spell_word_of_recall", right above the line:
+
+    if ((location = get_room_index( ROOM_VNUM_TEMPLE)) == NULL)
+
+  add this line:
+
+    if ((location = get_room_index(clan_table[ch->clan].room[0] )) == NULL)
+
+****[ CHANGES FOR FILE: "act_move.c" ]*********************************
+
+in function "do_recall", right above the line:
+
+    if ( ( location = get_room_index( ROOM_VNUM_TEMPLE ) ) == NULL )
+ 
+add this line:
+  
+    if ((location = get_room_index(clan_table[ch->clan].room[0] )) == NULL)
+
+
+****[ CHANGES FOR FILE: "handler.c" ]**********************************
+
+ in function "extract_char"  replace the if statment;
+  note: yours will not just be an empty statement, but I made the changes
+  before writing this, so I no longer have the original...
+
+    /* Death room is set in the clan tabe now */
+    if ( !fPull )
+    { 
+    }
+
+ with the following;
+
+    /* Death room is set in the clan table now */
+    if ( !fPull )
+    {   /* send char to clan temple (room[2]) */
+      if ( is_clan(ch) &&
+           (get_room_index(clan_table[ch->clan].room[2]) != NULL) )
+        char_to_room(ch,get_room_index(clan_table[ch->clan].room[2]));
+      else
+        char_to_room(ch,get_room_index(ROOM_VNUM_TEMPLE));
+      return;
+    }
+
+
+!! in tables.h
+
+(1)
+after this line, 
+ extern	 const	struct	bit_type	bitvector_type[];
+
+add this line
+ extern  const   struct  flag_type	guild_flags[];
+
+(2) find the declartion of "clan_table" and delete it. (in stock ROM's
+    tables.h, this is right around the very top of the file.
+
+(3) find the definition of "clan_type" and delete it. (Yep, delete it)
+
+!! in bit.c, in "struct flag_stat_type flag_stat_table[]" section, add
+
+    {   guild_flags,            FALSE   },
+
+
+
+!! in olc.c make the following changes;
+
+(1)  in "run_olc_editor" add the following 3 lines;
+
+    case ED_GUILD:
+        gedit( d->character, d->incomm );
+        break;
+
+(2)  in "show_commands" add the following 3 lines;
+
+        case ED_GUILD:
+            show_olc_cmds( ch, gedit_table );
+            break;
+
+(3)  in the "Interpreter Tables" section, add;
+
+/* Guild edit command table */
+const struct olc_cmd_type gedit_table[] =
+{
+    {   "commands",	show_commands   },
+    {   "create",	gedit_create	},
+    {   "flag",		gedit_flags	},
+    {   "list",		gedit_list	},
+    {   "ml",           gedit_ml        },
+    {   "name",		gedit_name	},
+    {   "whoname",	gedit_whoname	},
+    {   "rank",		gedit_rank	},
+    {   "rooms",        gedit_rooms     },
+    {   "show",		gedit_show	},
+    {   "skill",	gedit_skill	},
+    {   "?",		show_help	},
+    {   NULL,		0		}
+};
+
+
+(4)  in the "Interpreters" section, add;
+
+/** Function: gedit
+  * Descr   : Interprets commands sent while inside the guild editor.
+  *         : Passing appropriate commands on to editor, rest to mud.
+  * Returns : (N/A)
+  * Syntax  : (N/A| called by do_gedit only)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+void gedit( CHAR_DATA *ch, char *argument )
+{
+  CLAN_DATA *pClan;
+  char command[MIL];
+  char arg[MIL];
+  
+  int cmd;
+  
+  EDIT_GUILD(ch, pClan);
+  smash_tilde( argument );
+  strcpy( arg, argument );
+  argument = one_argument( argument, command );
+  
+  if ( ch->level < MAX_LEVEL -2 )
+  {
+    send_to_char("Insuffecient security to modify guild data", ch);
+    edit_done( ch );
+    return;
+  }
+
+  if ( !str_cmp(command, "done") )
+  {
+    edit_done( ch );
+    return;
+  }
+
+  if ( command[0] == '\0' )
+  {
+    gedit_show( ch, argument );
+    return;
+  }
+  
+  /* Search Table and Dispatch Command. */
+  for ( cmd = 0; gedit_table[cmd].name != NULL; cmd++ )
+  {
+    if ( !str_prefix( command, gedit_table[cmd].name ) )
+    {
+      if ( (*gedit_table[cmd].olc_fun) ( ch, argument ) )
+      {
+	SET_BIT( pClan->flags, GUILD_CHANGED );
+	return;
+      }
+      else
+       return;
+    }
+  }
+
+  /* Default to Standard Interpreter. */
+  interpret( ch, arg );
+  return;
+}
+
+
+(5)  in the "const struct editor_cmd_type editor_table[] =" add;
+
+    {   "guild",	do_gedit	},
+
+(6)  right above "do_aedit" (or any other suitable location) add;
+
+/** Function: do_gedit
+  * Descr   : Places user into the guild editor. Verifying Security.
+  * Returns : Message if improper security level.
+  * Syntax  : gedit [guild #|create]
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+void do_gedit( CHAR_DATA *ch, char *argument )
+{
+    CLAN_DATA *pClan;
+    int value;
+    char arg[MAX_STRING_LENGTH];
+
+    if ( IS_NPC(ch) )
+    	return;
+
+    pClan = &clan_table[1]; /* set default */
+
+    argument	= one_argument(argument,arg);
+
+    if ( is_number( arg ) )
+    {
+	value = atoi( arg );
+        pClan = get_clan_data( value );
+        if (pClan->name[0] == '\0')
+	{
+	    send_to_char( "That guild does not exist.\n\r", ch );
+	    return;
+	}
+    }
+    else
+    if ( !str_cmp( arg, "create" ) )
+    {
+	if ( ch->pcdata->security < 9 )
+	{
+	  send_to_char( "GEdit : Insuffecient security to create new guilds.\n\r", ch );
+  	  return;
+	}
+
+	gedit_create( ch, "" );
+	ch->desc->editor = ED_GUILD;
+	return;
+    }
+
+    if (ch->level < MAX_LEVEL -2 )
+    {
+	send_to_char("Insuffecient security to edit guilds.\n\r",ch);
+	return;
+    }
+
+    ch->desc->pEdit = pClan;
+    ch->desc->editor = ED_GUILD;
+    return;
+}
+
+(7) Right above the "get_area_data" function, add;
+
+/** Function: get_clan_data
+  * Descr   : Returns a pointer to the clan_table of the requested clan #
+  * Returns : (CLAN_DATA *)
+  * Syntax  : (n/a)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+CLAN_DATA *get_clan_data( int clan )
+{
+  if ( clan <= MAX_CLAN && 
+       (clan_table[clan].name != NULL && clan_table[clan].name[0] != '\0' ))
+    return &clan_table[clan];
+
+  return &clan_table[0]; /* null clan */
+}
+
+
+
+
+!! in olc.h, make the following changes;
+
+(1)  in the "Connected states for editor" defines, add
+
+#define ED_GUILD	6
+
+(2)  in the "Interpreter prototypes" section, add;
+
+void	gedit		args( ( CHAR_DATA *ch, char *argument ) );
+
+(3)  in the "Interpreter Table prototypes" section, add;
+
+extern const struct olc_cmd_type	gedit_table[];
+
+(4)  in the "Editor Commands" section, add;
+
+DECLARE_DO_FUN( do_gedit	);
+
+(5)  somewhere in the various "Editor prototypes" section, add;
+
+/** Guild Editor Prototypes
+  */
+DECLARE_OLC_FUN( gedit_flags		);
+DECLARE_OLC_FUN( gedit_rank		);
+DECLARE_OLC_FUN( gedit_skill		);
+DECLARE_OLC_FUN( gedit_show		);
+DECLARE_OLC_FUN( gedit_name		);
+DECLARE_OLC_FUN( gedit_whoname		);
+DECLARE_OLC_FUN( gedit_create		);
+DECLARE_OLC_FUN( gedit_list		);
+DECLARE_OLC_FUN( gedit_rooms            );
+DECLARE_OLC_FUN( gedit_ml               );
+
+
+!! in olc_act.c
+
+(1) After the line;
+
+  #define AEDIT( fun )            bool fun( CHAR_DATA *ch, char *argument )
+
+add this line;
+
+  #define GEDIT( fun )            bool fun( CHAR_DATA *ch, char *argument )
+ 
+
+(2) in the "olc_help_type help_table[] =", at the end, before the NULL, add
+
+    {   "guild",        guild_flags,     "Guild flags."			 },
+
+
+(3) add to the end of the file;
+
+/** Guild Editor Functions.
+ */
+
+/** Function: gedit_flags
+  * Descr   : Sets the various flags associated with guilds.
+  * Returns : True/False if changed.
+  * Syntax  : flags flag_id...
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_flags )
+{
+  CLAN_DATA *pClan;
+  long value = 0;
+  
+  if ( argument[0] != '\0' )
+  {
+    EDIT_GUILD( ch, pClan );
+
+    if ( ( value = flag_value( guild_flags, argument ) ) != NO_FLAG )
+    {
+      pClan->flags ^= value;
+      send_to_char( "Guild flag(s) toggled.\n\r", ch);
+      return TRUE;
+    }
+  }
+
+  send_to_char( "Syntax: flag [flag ID]\n\r"
+                "Type '? guild' for a list of valid flags.\n\r", ch );
+  return FALSE;
+}
+
+/** Function: gedit_rank
+  * Descr   : Sets the guild rank name
+  * Returns : True/False if changed.
+  * Syntax  : rank rank_id rank_name
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_rank )
+{
+  CLAN_DATA *pClan;
+  char arg1[4];
+ 
+  
+  EDIT_GUILD(ch, pClan);
+  
+  argument = one_argument(argument, arg1);
+
+  if (is_number(arg1) && atoi(arg1) <= MAX_RANK)
+  {
+    int value;
+    
+    value = atoi(arg1) -1;
+      
+    if (argument[0] != '\0')
+    {
+      free_string(pClan->rank[value].rankname);
+      pClan->rank[value].rankname = str_dup( argument );
+      send_to_char("Rank name changed.\n\r", ch);
+      return TRUE;
+    }
+  
+  }
+  
+  send_to_char("Syntax: rank rank# newname\n\r", ch);  
+  return FALSE;
+}
+
+/** Function: gedit_skill
+  * Descr   : Sets the skills associated with the various ranks.
+  * Returns : True/False if changed & notice if skill dosent exist.
+  * Syntax  : skill rank_# skill_name
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_skill )
+{
+  CLAN_DATA *pClan;
+  char arg1[4];
+ 
+  
+  EDIT_GUILD(ch, pClan);
+  
+  argument = one_argument(argument, arg1);
+
+  if (is_number(arg1) && atoi(arg1) <= MAX_RANK)
+  {
+    int value;
+    
+    value = atoi(arg1) -1;
+      
+    if (argument[0] != '\0')
+    {
+      free_string(pClan->rank[value].skillname);
+      pClan->rank[value].skillname = str_dup( argument );
+      if (skill_lookup(argument) == -1)
+        send_to_char("Notice: That skill does not exist.\n\r", ch);
+      send_to_char("Skill changed.\n\r", ch);
+      return TRUE;
+    }
+  
+  }
+  
+  send_to_char("Syntax: skill rank# newskill\n\r", ch);  
+  return FALSE;
+}
+
+ 
+/** Function: gedit_create
+  * Descr   : Creates a new, empty guild if room is available in the array.
+  * Returns : True/False if created
+  * Syntax  : (n/a)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_create )
+{
+  int i = 0;
+  
+  for (i=1; i < MAX_CLAN; i++) /* just loop through and find an open slot */
+  {
+    if (clan_lookup(clan_table[i].name) == 0)
+    break;
+  }
+
+  if (i <= MAX_CLAN) /* open slot */
+  {
+    CLAN_DATA *pClan;
+    int x;
+  
+    clan_table[i].name = str_dup("New Guild");
+    clan_table[i].who_name = str_dup("New Guild");
+
+    for (x = 0; x < MAX_RANK; x++)
+    {
+      clan_table[i].rank[x].rankname = str_dup("Empty");
+      clan_table[i].rank[x].skillname = str_dup("");
+    }
+
+    pClan = &clan_table[i]; /* return new clan data */
+    ch->desc->pEdit = pClan;
+    send_to_char("Guild created.\n\r", ch);
+    return TRUE;
+  }  
+
+  send_to_char("No room to create a new guild. Increase MAX_CLAN\n\r", ch);  
+  return FALSE;
+} 
+
+
+/** Function: gedit_list
+  * Descr   : List's all of the current guilds, including those not yet
+  *         : saved to the data file, and those marked for deletion.
+  * Returns : list of guilds.
+  * Syntax  : (N/A)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_list )
+{
+  char buf[MIL];
+  BUFFER *buffer;
+  int i;
+  
+  buffer = new_buf();
+  
+  sprintf(buf, "Num  Guild Name  Flags\n\r-----------------------------------------------\n\r");
+  add_buf(buffer, buf);
+  
+  for (i=1; i <= MAX_CLAN; i++)
+  {
+    if (clan_table[i].name != NULL && clan_table[i].name[0] != '\0')
+    {
+      sprintf(buf,"[%2d]  %s\t Flags:\t[%s]\n\r", 
+                  i, 
+                  clan_table[i].name,
+                  flag_string( guild_flags, clan_table[i].flags ) );
+      add_buf(buffer, buf);
+    }
+  }
+
+  page_to_char( buf_string(buffer), ch );
+  free_buf(buffer);
+  return FALSE;
+}      
+  
+ 
+/** Function: gedit_show
+  * Descr   : Displays currently selected guild data to the screen.
+  * Returns : (N/A)
+  * Syntax  : (N/A)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_show )
+{
+  CLAN_DATA *pClan;
+  
+  char buf[MIL];
+  BUFFER *buffer;
+  int i;
+  
+  EDIT_GUILD(ch, pClan);
+  
+  buffer = new_buf();
+  
+  sprintf(buf, "Name     : %s %s %s\n\rWho Name : %-10s\n\r",
+               pClan->name, 
+               IS_SET(pClan->flags, GUILD_CHANGED) ? "`c[`B*`c]`w" : "",
+               IS_SET(pClan->flags, GUILD_DELETED) ? "`RMarked for Deletion!`w" : "",
+               pClan->who_name);
+  add_buf(buffer, buf);
+
+  sprintf(buf, "Recall Room [%-6d]  Morgue Room [%-6d]  Clan Temple [%-6d]\n\r\n\r",
+               pClan->room[0], pClan->room[1], pClan->room[2]);
+  add_buf(buffer, buf);
+
+  sprintf(buf, "Flags:      [%s]\n\r\n\r", flag_string( guild_flags, pClan->flags ) );
+  add_buf(buffer, buf);
+
+  sprintf(buf, "#    Rank                      Skill Associated with this Rank\n\r--------------------------------------------------------------\n\r");
+  add_buf(buffer, buf);
+  for (i=0; i < MAX_RANK; i++)
+   {
+     sprintf(buf,"[%2d] %-25s %s\n\r", 
+             i+1, 
+             (pClan->rank[i].rankname  != '\0') ? pClan->rank[i].rankname : "None", 
+             (pClan->rank[i].skillname != '\0') ? pClan->rank[i].skillname : "");  
+     add_buf(buffer, buf);
+   }
+  
+  add_buf(buffer,"\n\r"); 
+  sprintf(buf, "Mortal Leader Rights\n\r--------------------\n\r");
+  add_buf(buffer, buf);
+  
+  sprintf(buf,"Can Guild   : %s\n\rCan Deguild : %s\n\rCan Promote : %s\n\rCan Demote  : %s\n\r",
+              (pClan->ml[0]==1) ? "True" : "False",
+              (pClan->ml[1]==1) ? "True" : "False",
+              (pClan->ml[2]==1) ? "True" : "False",
+              (pClan->ml[3]==1) ? "True" : "False"); 
+  add_buf(buffer, buf);
+  
+  page_to_char( buf_string(buffer), ch );
+  free_buf(buffer);
+  return FALSE;
+}
+
+
+/** Function: gedit_name
+  * Descr   : Changes the name of the currently selected guild.
+  * Returns : True/False if modified
+  * Syntax  : name new_name
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_name )
+{
+  CLAN_DATA *pClan;
+  
+  EDIT_GUILD(ch, pClan);
+  
+  if ( argument[0] == '\0' )
+  {
+    send_to_char( "Syntax:  name [name]\n\r", ch );
+    return FALSE;
+  }
+  
+  if (clan_lookup(argument) != 0)
+  {
+    send_to_char("That guild allready exists.\n\r", ch);
+    return FALSE;
+  }
+
+  if (pClan->name[0] != '\0')                          
+    free_string( pClan->name );
+ 
+  pClan->name = str_dup( argument );
+                                    
+  send_to_char( "Name set.\n\r", ch );
+  return TRUE;
+}
+
+
+/** Function: gedit_whoname
+  * Descr   : Changes the who_name of the currently selected guild.
+  * Returns : True/False if modified.
+  * Syntax  : whoname new_who_name
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_whoname )
+{
+  CLAN_DATA *pClan;
+  
+  EDIT_GUILD(ch, pClan);
+  
+  if ( argument[0] == '\0' )
+  {
+    send_to_char( "Syntax:  whoname [name]\n\r", ch );
+    return FALSE;
+  }
+  
+  if (pClan->who_name[0] != '\0')                          
+    free_string( pClan->who_name );
+  
+  pClan->who_name = str_dup( argument );
+                                    
+  send_to_char( "Who Name set.\n\r", ch );
+  return TRUE;
+}
+
+
+/** Function: gedit_rooms
+  * Descr   : Changes the vnum of the room(s) selected.
+  * Returns : True/False if modified.
+  * Syntax  : rooms [hall new#|morgue new#|temple new#]
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_rooms )
+{
+  CLAN_DATA *pClan;
+  char arg1[10], arg2[10], arg3[10], arg4[10], arg5[10], arg6[10];
+  bool set = FALSE;
+  
+  EDIT_GUILD(ch, pClan);
+  
+  if ( argument[0] == '\0' )
+  {
+    send_to_char( "Syntax:  rooms [hall #|morgue #|temple #]\n\r", ch );
+    return FALSE;
+  }
+
+  argument = one_argument(argument, arg1);
+  argument = one_argument(argument, arg2);
+  argument = one_argument(argument, arg3);
+  argument = one_argument(argument, arg4);
+  argument = one_argument(argument, arg5);
+  argument = one_argument(argument, arg6);
+
+  /* kinda of convoluted, I know, but this seemed the easiest way
+     to allow for any combination of commands. ie:
+       hall 1 morgue 2 temple 3 
+       morgue 2 hall 3 temple 1
+         or even
+       hall 1
+       morgue 2 hall 1
+  */
+  if (!str_cmp(arg1,"hall") && is_number(arg2) )
+    { pClan->room[0] = atoi(arg2); set = TRUE; }
+  else
+  if (!str_cmp(arg1,"morgue") && is_number(arg2) )
+    { pClan->room[1] = atoi(arg2); set = TRUE; } 
+  else
+  if (!str_cmp(arg1,"temple") && is_number(arg2) )
+    { pClan->room[2] = atoi(arg2); set = TRUE; }
+    
+  if (!str_cmp(arg3,"hall") && is_number(arg4) )
+    { pClan->room[0] = atoi(arg4); set = TRUE; }
+  else
+  if (!str_cmp(arg3,"morgue") && is_number(arg4) )
+    { pClan->room[1] = atoi(arg4); set = TRUE; } 
+  else
+  if (!str_cmp(arg3,"temple") && is_number(arg4) )
+    { pClan->room[2] = atoi(arg4); set = TRUE; }
+
+  if (!str_cmp(arg5,"hall") && is_number(arg6) )
+    { pClan->room[0] = atoi(arg6); set = TRUE; }
+  else
+  if (!str_cmp(arg5,"morgue") && is_number(arg6) )
+    { pClan->room[1] = atoi(arg6); set = TRUE; } 
+  else
+  if (!str_cmp(arg5,"temple") && is_number(arg6) )
+    { pClan->room[2] = atoi(arg6); set = TRUE; }
+    
+  if (set)
+  {
+    send_to_char("Room(s) set.\n\r", ch);
+    return TRUE;
+  }
+      
+  return FALSE;
+}
+
+
+/** Function: gedit_ml
+  * Descr   : Changes the mortal leader settings.
+  * Returns : True/False if modified
+  * Syntax  : ml [true/false|true/false|true/false|true/false]
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+GEDIT( gedit_ml )
+{
+  CLAN_DATA *pClan;
+  char arg1[6], arg2[6], arg3[6], arg4[6];
+  bool set = FALSE;
+  
+  EDIT_GUILD(ch, pClan);
+  
+  if ( argument[0] == '\0' )
+  {
+    send_to_char( "Syntax:  ml TRUE|FALSE TRUE|FALSE TRUE|FALSE TRUE|FALSE\n\r", ch );
+    return FALSE;
+  }
+
+  argument = one_argument(argument, arg1);
+  argument = one_argument(argument, arg2);
+  argument = one_argument(argument, arg3);
+  argument = one_argument(argument, arg4);
+
+  if (!str_prefix(arg1,"true") )
+    { pClan->ml[0] = TRUE; set = TRUE; }
+  else
+  if (!str_prefix(arg1, "false") )
+    { pClan->ml[0] = FALSE; set = TRUE; }
+
+  if (!str_prefix(arg2,"true") )
+    { pClan->ml[1] = TRUE; set = TRUE; }
+  else
+  if (!str_prefix(arg2, "false") )
+    { pClan->ml[1] = FALSE; set = TRUE; }
+
+  if (!str_prefix(arg3,"true") )
+    { pClan->ml[2] = TRUE; set = TRUE; }
+  else
+  if (!str_prefix(arg3, "false") )
+    { pClan->ml[2] = FALSE; set = TRUE; }
+   
+  if (!str_prefix(arg4,"true") )
+    { pClan->ml[3] = TRUE; set = TRUE; }
+  else
+  if (!str_prefix(arg4, "false") )
+    { pClan->ml[3] = FALSE; set = TRUE; }
+
+  if (set)
+  {
+    send_to_char("Mortal Leader traits set.\n\r", ch);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+
+
+!! In "olc_save.c", add the following function.
+
+
+/** Function: save_guilds
+  * Descr   : Writes the clan_table to /data/guild.dat file.
+  * Returns : (N/A)
+  * Syntax  : (N/A)
+  * Written : v1.0 3/98
+  * Author  : Gary McNickle <gary@dharvest.com>
+  */
+void save_guilds(CHAR_DATA *ch, char *argument)
+{
+  FILE *fp;
+  int i;
+  int value;
+  char buf[MSL];
+  
+  sprintf(buf, "%sguild.dat", DATA_DIR);
+
+  if ( !( fp = fopen(buf, "w+" ) ) )
+  {
+     bug( "Open_guild: fopen", 0 );
+     return;
+  }
+  
+  for (i=1; clan_lookup(clan_table[i].name) != 0; i++)
+  {
+    if ( !IS_SET(clan_table[i].flags, GUILD_DELETED) && clan_lookup(clan_table[i].name) != 0)
+    {
+      fprintf(fp, "\nGuild\t%s~\n", clan_table[i].name);
+
+      fprintf(fp, "Who\t%s~\n", clan_table[i].who_name);
+
+      fprintf(fp, "Rooms\t%d\t%d\t%d\n", 
+                   clan_table[i].room[0],  
+                   clan_table[i].room[1],
+                   clan_table[i].room[2]);
+
+      for (value=0; value < MAX_RANK; value++)
+      {  
+        if (clan_table[i].rank[value].rankname == NULL ||
+            clan_table[i].rank[value].rankname[0] == '\0')
+           clan_table[i].rank[value].rankname = str_dup("Unassigned");
+            
+          fprintf(fp, "Rank\t%d\t%s~\n", 
+                       value+1, 
+                       clan_table[i].rank[value].rankname);
+      }
+        
+      for (value=0; value < MAX_RANK; value++)
+        if (clan_table[i].rank[value].skillname != NULL &&
+            clan_table[i].rank[value].skillname[0] != '\0')
+          fprintf(fp, "Skill\t%d\t%s~\n", 
+                       value+1, 
+                       clan_table[i].rank[value].skillname);
+  
+      fprintf(fp, "ML\t%d  %d  %d  %d\n", 
+                   clan_table[i].ml[0],
+                   clan_table[i].ml[1],
+                   clan_table[i].ml[2],
+                   clan_table[i].ml[3]);
+      
+      /* Remove "changed" bit before writing flags to file */
+      if (IS_SET(clan_table[i].flags, GUILD_CHANGED))
+        REMOVE_BIT(clan_table[i].flags, GUILD_CHANGED);
+        
+      fprintf( fp, "Flags %s \n",  fwrite_flag( clan_table[i].flags,  buf ) );
+
+      fprintf(fp, "\n");
+    }
+  }  
+  
+  fprintf(fp, "\nEnd\n");
+  fclose(fp);
+  send_to_char("Guild data file (guild.dat) written.\n\r", ch);
+  return;        
+}
+
+
+
+***************************** END OF CHANGES **************************
+
+That should do it for ya. Recompile, and if you have any problems, let me
+know, I'll do what I can to help you get them straightened out. --Gary
+
+Keep in mind that so far, this has all been done as a basic guild system,
+it's my hope that with the changes made, updating and adding to this will
+be much easier than before. There are many applications that can be done
+with guilds, this should give you a solid foundation to build on.
+
+
+[clan-2.0/install.fresh, 3/27/98, Gary McNickle, gary@dharvest.com]

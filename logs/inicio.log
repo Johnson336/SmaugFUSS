@@ -1,0 +1,16 @@
+[DBLOG] ---------------------[ Log de inicio ]--------------------
+[DBLOG] load_room_reset: brigantia.zona (1) 'G': objeto 35 no existe.
+[DBLOG] load_room_reset: brigantia.zona (1) 'G': objeto 34 no existe.
+[DBLOG] load_room_reset: brigantia.zona (1) 'G': objeto 36 no existe.
+[DBLOG] load_room_reset: brigantia.zona (1) 'G': objeto 37 no existe.
+[DBLOG] load_room_reset: brigantia.zona (1) 'G': objeto 34 no existe.
+[DBLOG] Establecer salidas: habitacion 21291, la salida up apunta a un vnum incorrecto (7914)
+[DBLOG] Establecer salidas: habitacion 29502, la salida south apunta a un vnum incorrecto (15404)
+[DBLOG] Establecer salidas: habitacion 21338, la salida up apunta a un vnum incorrecto (800)
+[DBLOG] Establecer salidas: habitacion 24010, la salida west apunta a un vnum incorrecto (7908)
+[DBLOG] Establecer salidas: habitacion 30232, la salida west apunta a un vnum incorrecto (164)
+[DBLOG] Establecer salidas: habitacion 30233, la salida north apunta a un vnum incorrecto (-1)
+[DBLOG] Establecer salidas: habitacion 32301, la salida down apunta a un vnum incorrecto (1035)
+[DBLOG] Establecer salidas: habitacion 3700, la salida south apunta a un vnum incorrecto (3747)
+[DBLOG] Establecer salidas: habitacion 3700, la salida down apunta a un vnum incorrecto (31000)
+[DBLOG] Establecer salidas: habitacion 3718, la salida north apunta a un vnum incorrecto (3727)

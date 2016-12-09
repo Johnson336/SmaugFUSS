@@ -10,12 +10,13 @@
  * Cameron Carroll (Cam), Cyberfox, Karangi, Rathian, Raine,                *
  * Xorith, and Adjani.                                                      *
  * All Rights Reserved.                                                     *
+ * Registered with the United States Copyright Office: TX 5-877-286         *
  *                                                                          *
  * External contributions from Remcon, Quixadhal, Zarius, and many others.  *
  *                                                                          *
- * Original SMAUG 1.8b written by Thoric (Derek Snider) with Altrag,        *
+ * Original SMAUG 1.4a written by Thoric (Derek Snider) with Altrag,        *
  * Blodkai, Haus, Narn, Scryn, Swordbearer, Tricops, Gorog, Rennard,        *
- * Grishnakh, Fireblade, Edmond, Conran, and Nivek.                         *
+ * Grishnakh, Fireblade, and Nivek.                                         *
  *                                                                          *
  * Original MERC 2.1 code by Hatchet, Furey, and Kahn.                      *
  *                                                                          *
@@ -32,7 +33,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
-#include "mud.h"
+#include "kallaikia.h"
 
 DNS_DATA *first_cache;
 DNS_DATA *last_cache;
@@ -68,7 +69,7 @@ void check_dns( void )
       prune_dns(  );
 }
 
-void add_dns( const char *dhost, const char *address )
+void add_dns( char *dhost, char *address )
 {
    DNS_DATA *cache;
 
@@ -172,7 +173,7 @@ void load_dns( void )
 
          if( letter != '#' )
          {
-            bug( "%s: # not found.", __func__ );
+            bug( "%s: # not found.", __FUNCTION__ );
             break;
          }
 
@@ -188,7 +189,7 @@ void load_dns( void )
             break;
          else
          {
-            bug( "%s: bad section: %s.", __func__, word );
+            bug( "%s: bad section: %s.", __FUNCTION__, word );
             continue;
          }
       }
@@ -208,7 +209,7 @@ void save_dns( void )
 
    if( !( fp = fopen( filename, "w" ) ) )
    {
-      bug( "%s: fopen", __func__ );
+      bug( "%s: fopen", __FUNCTION__ );
       perror( filename );
    }
    else
@@ -243,7 +244,7 @@ bool read_from_dns( int fd, char *buffer )
    iStart = strlen( inbuf );
    if( iStart >= sizeof( inbuf ) - 10 )
    {
-      bug( "%s: DNS input overflow!!!", __func__ );
+      bug( "%s: DNS input overflow!!!", __FUNCTION__ );
       return FALSE;
    }
 
@@ -389,11 +390,11 @@ void resolve_dns( DESCRIPTOR_DATA * d, long ip )
          close( i );
 
       snprintf( str_ip, 64, "%ld", ip );
-      execl( "../src/resolver", "AFKMud Resolver", str_ip, NULL );
+      execl( "./resolver_dns", "Phantasien III Mud Resolver", str_ip, NULL );
       /*
        * Still here --> hmm. An error. 
        */
-      bug( "%s: Exec failed; Closing child.", __func__ );
+      bug( "%s: Exec failed; Closing child.", __FUNCTION__ );
       d->ifd = -1;
       d->ipid = -1;
       exit( 0 );
@@ -409,7 +410,7 @@ void resolve_dns( DESCRIPTOR_DATA * d, long ip )
    }
 }
 
-void do_cache( CHAR_DATA* ch, const char* argument)
+void do_cache( CHAR_DATA * ch, char *argument )
 {
    DNS_DATA *cache;
    int ip = 0;

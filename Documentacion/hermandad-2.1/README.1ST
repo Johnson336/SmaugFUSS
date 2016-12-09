@@ -1,0 +1,50 @@
+  
+
+  This is a large snippet, and it has undergone many changes since
+it's first release.  Because of that, it's likely, even probable, that I
+missed something in the installation instructions. Let me apologize for that
+right now.  If you do have problems, and cant figure out how to fix them,
+feel free to email me at gary@dharvest.com. I'll do my best to give you a
+hand with it.  Also, the rom mailing list is a great tool for that as well.
+
+  Many of you have asked me for a patch file to patch this into Rom2.4b.
+Becuase this version requires OLC, which does not come included with Rom24,
+I'm unable to do that due to copyrights.
+
+  NOTE: If at any time your mud crashes during the startup, while reading
+the first area file, the problem is likely that you have MAX_CLANS defined
+at two small of a number.  In other words, you have more clans than you have
+defined in MAX_CLANS.
+
+  Some notes about changes in version 2 from all previous versions.  
+
+1) Version 2 adds the OLC editor (gedit) for guilds. 
+
+2) Flags were added to the guild structure. These replace, for example,
+   the "independent" value of the structure.  So, all references to 
+   independent will need to be changed.  (see changes.txt) Also, the flags
+   adds a great deal of flexibility to guilds/clans.  With flags, it will
+   be much easier to check for specific guilds. For example, on our mud, we
+   have a "wolf kin" guild that has skills only available to that guild, we
+   use the flags to determine that.
+
+3) Changes were made to the guild.dat file.  As stated before, the "bool
+   independent" variable was removed from the structure.  You may want to
+   keep this variable in the new structure, after making all the necessary
+   changes, compile, load up the mud, and then run "gsave". This will write
+   the guild.dat file over into the new format.  Just dont forget to remove
+   "independent" from the structure once your done. OR, just go through
+   the guild.dat file, and delete all the "Ind" lines...
+
+4) Another room was added. The "Temple" (Thanks Zanthras for this idea).
+
+   Let me clarify the way these rooms are supposed to work. There are 3
+   rooms, "hall", "morgue", and "temple".  The way I have them set up, is
+   that when a player recalls, or casts recall, the are sent to their
+   "hall", when a player dies, his corpse is sent to the "morgue" and his
+   resuurected self is sent to the "temple".
+
+
+
+
+[README.1ST, 3/27/98, Gary McNickle, gary@dharvest.com]

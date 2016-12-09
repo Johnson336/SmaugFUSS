@@ -1,0 +1,57 @@
+#CELL		  0 0
+Climate     3
+Hemisphere  1
+State       70 82 43 64 96 14 -47 2
+End
+
+#CELL		  1 0
+Climate     7
+Hemisphere  1
+State       26 0 25 14 100 21 -12 20
+End
+
+#CELL		  2 0
+Climate     0
+Hemisphere  1
+State       10 86 60 100 57 74 81 -87
+End
+
+#CELL		  0 1
+Climate     9
+Hemisphere  0
+State       74 27 32 69 96 31 -44 -18
+End
+
+#CELL		  1 1
+Climate     9
+Hemisphere  1
+State       71 62 35 62 95 30 -3 -52
+End
+
+#CELL		  2 1
+Climate     7
+Hemisphere  1
+State       28 0 29 20 100 35 -61 -16
+End
+
+#CELL		  0 2
+Climate     2
+Hemisphere  1
+State       25 82 28 10 100 42 39 -61
+End
+
+#CELL		  1 2
+Climate     3
+Hemisphere  0
+State       40 20 38 21 100 48 -28 -53
+End
+
+#CELL		  2 2
+Climate     3
+Hemisphere  0
+State       27 1 22 20 100 61 -26 -50
+End
+
+
+#END
+

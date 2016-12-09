@@ -1,105 +1,204 @@
+#!/usr/bin/make -f
+
+########################################
+#
+#      Kallaikia v1.9.1 (Ith)
+#
+#      Basado en SMAUG 1.9 (FUSS)
+#
+########################################
+
+NOMBRE = kallaikia
+VERSION = 1.9.1
+DESCRIPCION = O Reino das Tebras
+
+########################################
+# Opciones del servidor
+########################################
+
+#IMC2 - Comentar para deshabilitar el soporte IMC2 (Mud Network Chat)
+IMC = -DIMC -DIMCSMAUG
+
+# Comentar para incluir planos
+PLANOS = -DPLANES
+
+
+########################################
+# Arquitectura del sistema
+########################################
+
+HOSTNAME = `hostname`
+ARCH = `uname -m`
+
+########################################
+# Opciones para G++
+########################################
+
 CC      = g++
 #PROF    = -p
 
-#Uncomment to compile in Cygwin
-#CYGWIN = -DCYGWIN
-
-#Uncomment the line below if you are getting undefined references to dlsym, dlopen, and dlclose.
-#Comment it out if you get errors about ldl not being found.
+#Descomentar si se obtienen referencias indefinidas para dlsym, dlopen, and dlclose.
+#Comentar si se obtienen errores de ldl no encontrado.
 NEED_DL = -ldl
 
-#Some systems need this for dynamic linking to work.
+#Algunos sistemas necesitan esto para el enlazado dinamico.
 EXPORT_SYMBOLS = -export-dynamic
 
-# Uncomment the two lines below if compiling on a Solaris box
-#SOLARIS_FLAG = -Dsun -DSYSV
-#SOLARIS_LINK = -lnsl -lsocket
+# Descomentar para modo desarrollo/debug  
+# Comentar para modo distribucion
+# CXX_FLAGS = -Wall -Wshadow -Wformat-security -Wpointer-arith -Wcast-align -Wredundant-decls -Wconversion -Wwrite-strings -Wunused-result
 
-#IMC2 - Comment out to disable IMC2 support
-IMC = 1
+# Descomentar para modo distribucion
+# Comentar para modo desarrollo/debug
+CXX_FLAGS = -Wno-all -fpermissive -Wno-conversion -Wno-write-strings -Wno-shadow -Wno-format-security -Wno-pointer-arith -Wno-cast-align -Wno-redundant-decls -Wno-unused-result
 
-W_FLAGS = -Wall -Werror -Wshadow -Wformat-security -Wpointer-arith -Wcast-align -Wredundant-decls
+########################################
+# GCC FLAGS Completos
+########################################
 
-C_FLAGS = -g2 $(W_FLAGS) $(SOLARIS_FLAG) $(PROF) $(EXPORT_SYMBOLS)
-L_FLAGS = $(PROF) $(SOLARIS_LINK) -lz $(NEED_DL)
-#D_FLAGS : For the DNS Slave process. No need in linking all the extra libs for this.
-D_FLAGS = -g2 -O $(PROF) $(SOLARIS_LINK)
+# DNS_FLAGS - Para el proceso resolver_dns, no es neceario enlazar todas las librerias.
+DNS_FLAGS = -g2 -O -pipe $(PROF)
 
-C_FILES = act_comm.c act_info.c act_move.c act_obj.c act_wiz.c ban.c boards.c \
-          build.c calendar.c chess.c clans.c color.c comm.c comments.c const.c db.c deity.c \
-          dns.c fight.c handler.c hashstr.c hint.c hotboot.c house.c imm_host.c interp.c \
-          liquids.c magic.c makeobjs.c mapout.c mapper.c mccp.c \
-          misc.c mpxset.c mssp.c mud_comm.c mud_prog.c news.c planes.c player.c polymorph.c \
-          renumber.c reset.c save.c services.c sha256.c shops.c skills.c special.c tables.c \
-          track.c update.c variables.c weather.c
+C_FLAGS = -O -g2 -pipe $(CXX_FLAGS) $(PROF) $(EXPORT_SYMBOLS) -DSMAUG
 
-ifdef IMC
-   C_FILES := imc.c $(C_FILES)
-   C_FLAGS := $(C_FLAGS) -DIMC -DIMCSMAUG
+ifeq ($(ARCH), x86_64)
+C_FLAGS := $(C_FLAGS) -march=$(ARCH) -mtune=$(ARCH)
+else
+C_FLAGS := $(C_FLAGS)
 endif
 
-O_FILES := $(patsubst %.c,o/%.o,$(C_FILES))
+L_FLAGS = $(PROF) -lz $(NEED_DL)
+
+########################################
+# Ficheros C para compilar
+########################################
+
+C_FILES = actualizar.c \
+xadrez.c \
+banear.c \
+calendario.c \
+clans.c \
+clima.c \
+cor.c \
+comentarios.c \
+comunicacions.c \
+consellos.c \
+constantes.c \
+construir.c \
+convertir_mapas.c \
+crear_obxetos.c \
+db.c \
+deidades.c \
+dns.c \
+especial.c \
+gardar.c \
+manexador.c \
+cifrarcadeas.c \
+inicio.c \
+interprete.c \
+xogador.c \
+xogador_combate.c \
+xogador_comunicacions.c \
+xogador_feitizos.c \
+xogador_informacion.c \
+xogador_inmortais_seguridade.c \
+xogador_maxia.c \
+xogador_movemento.c \
+xogador_obxetos.c \
+xogador_polimorfismo.c \
+xogador_rastrexar.c \
+xogador_varios.c \
+xogador_wiz.c \
+liquidos.c \
+mapeador.c \
+mccp.c \
+mpxset.c \
+novas.c \
+kallaikia.c \
+kallaikia_comunicacions.c \
+renumerar.c \
+resetear.c \
+sha256.c \
+taboas_datos.c \
+taboeiros_de_anuncios.c \
+tendas.c \
+variables.c
+
+# Ficheros adicionales para soporte IMC
+ifdef IMC
+   C_FILES := imc.c $(C_FILES)
+   C_FLAGS := $(C_FLAGS) $(IMC)
+endif
+
+# Ficheros adicionales para Planos
+ifdef PLANOS
+   C_FILES := planos.c $(C_FILES)
+   C_FLAGS := $(C_FLAGS) $(PLANOS)
+endif
+
+# Obxetos del compilador xeneranse en "obxetos_compilador"
+O_FILES := $(patsubst %.c,obxetos_compilador/%.o,$(C_FILES))
 
 H_FILES = $(wildcard *.h) 
 
-all:
-	$(MAKE) -s smaug
-	$(MAKE) -s dns
+########################################
+# Construir el codigo
+########################################
 
-# pull in dependency info for *existing* .o files
+all: clean
+	@mkdir obxetos_compilador
+	@echo && echo " [ "$(MAKE)" ] Construccion -> \""$(NOMBRE)" "$(VERSION)" ("$(ARCH)")\" en $(HOSTNAME)." && echo
+	@echo " [ "$(MAKE)" ] C_FLAGS -> \""$(C_FLAGS)"\"" && echo  
+	@$(MAKE) -s $(NOMBRE)
+	@echo && echo " [ "$(MAKE)" ] Construccion -> \""$(NOMBRE)"\" buscador DNS." && echo
+	@$(MAKE) -s resolver_dns
+	@echo " [ "$(MAKE)" ] Finalizado! -> \""$(NOMBRE)" "$(VERSION)" ("$(ARCH)")\"." && echo
+
+# Incluir las dependencias para los obxetos existentes
 -include dependencies.d
 
-ifdef CYGWIN
-smaug: $(O_FILES)
-	rm -f smaug.exe
-	dlltool --export-all --output-def smaug.def $(O_FILES)
-	dlltool --dllname smaug.exe --output-exp smaug.exp --def smaug.def
-	$(CC) -o smaug.exe $(O_FILES) smaug.exp $(L_FLAGS)
-	@echo "Generating dependency file ...";
+$(NOMBRE): $(O_FILES)
+	rm -f ../$(NOMBRE)
+	$(CC) -export-dynamic -o ../$(NOMBRE) $(O_FILES) $(L_FLAGS)
+	@echo && echo " [ "$(MAKE)" ] Xerar o ficheiro de dependencia \"dependencies.d\".";
 	@$(CC) -MM $(C_FLAGS) $(C_FILES) > dependencies.d
 	@perl -pi -e 's.^([a-z]).o/$$1.g' dependencies.d
-	@echo "Done compiling mud.";
-	chmod g+w smaug.exe
-	chmod a+x smaug.exe
+	echo " [ "$(MAKE)" ] Finalizada a construccion de: \""$(NOMBRE)"\"."
+	chmod g+w ../$(NOMBRE)
+	chmod a+x ../$(NOMBRE)
 	chmod g+w $(O_FILES)
 
-clean:
-	@rm -f o/*.o smaug.exe dependencies.d resolver.exe resolver.o *~
+resolver_dns: obxetos_compilador/resolver_dns.o
+	rm -f ../resolver_dns
+	$(CC) $(DNS_FLAGS) -o ../resolver_dns obxetos_compilador/resolver_dns.o
+	@echo " [ "$(MAKE)" ] Finalizada a construccion de buscador DNS: \"resolver_dns\"." && echo
+	chmod g+w ../resolver_dns
+	chmod a+x ../resolver_dns
 
-else
-smaug: $(O_FILES)
-	rm -f smaug
-	$(CC) -export-dynamic -o smaug $(O_FILES) $(L_FLAGS)
-	@echo "Generating dependency file ...";
-	@$(CC) -MM $(C_FLAGS) $(C_FILES) > dependencies.d
-	@perl -pi -e 's.^([a-z]).o/$$1.g' dependencies.d
-	@echo "Done compiling mud.";
-	chmod g+w smaug
-	chmod a+x smaug
-	chmod g+w $(O_FILES)
-
-clean:
-	@rm -f o/*.o smaug dependencies.d resolver resolver.o *~
-endif
-
-dns: resolver.o
-	rm -f resolver
-	$(CC) $(D_FLAGS) -o resolver resolver.o
-	@echo "Done compiling DNS resolver.";
-	chmod g+w resolver
-	chmod a+x resolver
-	chmod g+w resolver.o
-
-indent:
-	indent -ts3 -nut -nsaf -nsai -nsaw -npcs -npsl -ncs -nbc -bls -prs -bap -cbi0 -cli3 -bli0 -l125 -lp -i3 -cdb -c1 -cd1 -sc -pmt $(C_FILES)
-	indent -ts3 -nut -nsaf -nsai -nsaw -npcs -npsl -ncs -nbc -bls -prs -bap -cbi0 -cli3 -bli0 -l125 -lp -i3 -cdb -c1 -cd1 -sc -pmt $(H_FILES)
-
-indentclean:
-	rm *.c~ *.h~
-
-o/%.o: %.c
-	echo "  Compiling $@....";
+obxetos_compilador/%.o: %.c
+	echo " [ "$(CC)" ] Construir -> $@ ... "
 	$(CC) -c $(C_FLAGS) $< -o $@
 
-.c.o: mud.h
+.c.o: $(NOMBRE).h
 	$(CC) -c $(C_FLAGS) $<
+
+clean:
+	@rm -rfv obxetos_compilador dependencies.d *~ ../*/*~ ../*~
+
+cleanall:
+	@rm -rfv ../$(NOMBRE) obxetos_compilador dependencies.d ../resolver_dns *~ ../*/*~ ../*~
+
+dist:
+	@echo && echo " [ "$(MAKE)" ] Limpar obxetos do codigo e ficheros de log ..." && echo
+	@$(MAKE) -s clean && cd .. && touch logs/$(NOMBRE).log && rm -v logs/*
+	@echo && echo " [ "$(MAKE)" ] Creando o ficheiro de distribucion: \"../../"$(NOMBRE)"-"$(VERSION)".tar.bz2\" ..."
+	@cd .. && tar cfj ../$(NOMBRE)-$(VERSION).tar.bz2 *
+	@echo " [ "$(MAKE)" ] Finalizado." && echo
+
+git:
+	@$(MAKE) -s cleanall; \
+	cd ..; \
+	git add -A; \
+	git commit -m "Publicado desde $(HOSTNAME)"; \
+	git push origin master
+
