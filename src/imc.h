@@ -15,7 +15,7 @@
  * This name was chosen to represent the ideals of not only the code, but of the
  * network which spawned it.
  */
-#define IMC_VERSION_STRING "IMC2 Freedom CL-2.2 "
+#define IMC_VERSION_STRING "IMC2 Freedom CL-2.1b "
 #define IMC_VERSION 2
 
 /* Number of entries to keep in the channel histories */
@@ -25,15 +25,15 @@
 /* Remcon: Ask and ye shall receive. */
 #define IMC_DIR          "../imc/"
 
-#define IMC_CHANNEL_FILE IMC_DIR "imc.channels"
-#define IMC_CONFIG_FILE  IMC_DIR "imc.config"
-#define IMC_BAN_FILE     IMC_DIR "imc.ignores"
+#define IMC_CHANNEL_FILE IMC_DIR "imc.canales"
+#define IMC_CONFIG_FILE  IMC_DIR "imc.configuracion"
+#define IMC_BAN_FILE     IMC_DIR "imc.ignorados"
 #define IMC_UCACHE_FILE  IMC_DIR "imc.ucache"
 #define IMC_COLOR_FILE   IMC_DIR "imc.color"
-#define IMC_HELP_FILE    IMC_DIR "imc.help"
-#define IMC_CMD_FILE     IMC_DIR "imc.commands"
-#define IMC_HOTBOOT_FILE IMC_DIR "imc.hotboot"
-#define IMC_WHO_FILE     IMC_DIR "imc.who"
+#define IMC_HELP_FILE    IMC_DIR "imc.ayuda"
+#define IMC_CMD_FILE     IMC_DIR "imc.comandos"
+#define IMC_HOTBOOT_FILE IMC_DIR "imc.inicio"
+#define IMC_WHO_FILE     IMC_DIR "imc.quien"
 
 /* Make sure you set the macros in the imccfg.h file properly or things get ugly from here. */
 #include "imccfg.h"
@@ -127,7 +127,7 @@ do                            \
 {                             \
    if((point))                \
    {                          \
-      free( (void*) (point));          \
+      free((point));          \
       (point) = NULL;         \
    }                          \
 } while(0)
@@ -211,11 +211,11 @@ typedef struct imc_cmd_alias IMC_ALIAS;   /* Big, bad, bloated command alias thi
 typedef struct imc_packet_handler IMC_PHANDLER; /* custom packet handlers added dynamically */
 typedef struct who_template WHO_TEMPLATE; /* The who templates */
 
-typedef void IMC_FUN( CHAR_DATA * ch, const char *argument );
-#define IMC_CMD( name ) void (name)( CHAR_DATA *ch, const char *argument )
+typedef void IMC_FUN( CHAR_DATA * ch, char *argument );
+#define IMC_CMD( name ) void (name)( CHAR_DATA *ch, char *argument )
 
-typedef void PACKET_FUN( IMC_PACKET * q, const char *packet );
-#define PFUN( name ) void (name)( IMC_PACKET *q, const char *packet )
+typedef void PACKET_FUN( IMC_PACKET * q, char *packet );
+#define PFUN( name ) void (name)( IMC_PACKET *q, char *packet )
 
 extern REMOTEINFO *first_rinfo;
 extern REMOTEINFO *last_rinfo;
@@ -413,7 +413,7 @@ struct who_template
    char *master;
 };
 
-bool imc_command_hook( CHAR_DATA * ch, const char *command, const char *argument );
+bool imc_command_hook( CHAR_DATA * ch, char *command, char *argument );
 void imc_hotboot( void );
 void imc_startup( bool force, int desc, bool connected );
 void imc_shutdown( bool reconnect );

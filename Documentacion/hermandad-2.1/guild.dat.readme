@@ -1,0 +1,54 @@
+The "guild.dat" file is the file that sets up your clans/guilds on the
+mud.  The format is really simple, and I've included an example file for
+you to look at as well. but let's talk a bit about the different lines
+here.
+
+Keys	Description
+----------------------------------------------------------------------
+Guild	Obviously, this is the name of the guild.
+
+Who	This name is what is used in "who" or "whois" commands, it's
+        what's shown in the title string for each character.
+	Color codes are fine here, but I really dont recommend them
+        anywhere else.
+
+Rooms	There should be three room vnums here, the first is the clan
+        "hall", this is where players are sent when they recall, the
+        second is the clan "morgue", or where theyre corpses are sent
+        when they die. The third, is the clan "Temple" where the players
+        sent upon death. Entering a 0 in any of these will instruct the 
+        mud to use the default room. (usually vnum 3054)
+
+Rank    Each rank must be numbered, followed by the ranks name, example
+        "Rank 1 Junior carpenter~"  (be sure you follow all strings with
+        the tilde character).  You can have as many ranks as you have 
+        defined in MAX_RANKS, each rank must be numbered incrementally,
+        and each must have a rank name.
+
+Skill   Each rank may also have an associated skill that the player is
+        given (at 1%) when they are promoted to this rank. Each skill must
+        be numbered to match the rank# that it's associated with, and each
+        must list the name of the skill to grant the character.  example:
+        "Skill	3	circle~" gives the skill "circle" to the player of
+        this guild when he attains the third rank. 
+
+ML      This defines the properties to give to your mortal leaders. By
+        default, the mortal leader is defined as rank MAX_RANKS. This
+        works in a true or false manner, and looks like this in the file:
+        "ML	0 0 1 1". These numbers stand for the following, in order.
+
+           Mortal Leader can guild
+           Mortal Leader can deguild
+           Mortal Leader can promote
+           Mortal Leader can demote
+
+Flags  These are the various flags associated with this guild. For all new
+       guilds, set this value to 0. It's much easier to change this in the
+       guild editor.
+
+See the file "guild.dat" that came with this archive for working examples.
+
+The last line of the file should contain only the word: "End", looking
+like this;
+
+End

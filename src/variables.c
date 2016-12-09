@@ -1,7 +1,7 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
@@ -12,13 +12,13 @@
  * Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,          *
  * Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.     *
  * ------------------------------------------------------------------------ *
- *                   Variable Handling Module (Thoric)                      *
+ * 			Variable Handling Module (Thoric)                         *
  ****************************************************************************/
 
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "mud.h"
+#include "phantasienIII.h"
 
 VARIABLE_DATA *make_variable( char type, int vnum, char *tag )
 {
@@ -186,7 +186,7 @@ bool is_valid_tag( const char *tagname )
 /*
  * mptag <victim> <tag> [value]
  */
-void do_mptag( CHAR_DATA* ch, const char* argument)
+void do_mptag( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *victim;
    VARIABLE_DATA *vd;
@@ -246,11 +246,9 @@ void do_mptag( CHAR_DATA* ch, const char* argument)
       return;
    }
    error = FALSE;
-
-   const char* p2;
-   for( p2 = argument; *p2; p2++ )
+   for( p = argument; *p; p++ )
    {
-      if( !isdigit( *p2 ) && !isspace( *p2 ) )
+      if( !isdigit( *p ) && !isspace( *p ) )
       {
          error = TRUE;
          break;
@@ -273,7 +271,7 @@ void do_mptag( CHAR_DATA* ch, const char* argument)
 /*
  * mprmtag <victim> <tag>
  */
-void do_mprmtag( CHAR_DATA* ch, const char* argument)
+void do_mprmtag( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *victim;
    char *p;
@@ -327,7 +325,7 @@ void do_mprmtag( CHAR_DATA* ch, const char* argument)
 /*
  * mpflag <victim> <tag> <flag>
  */
-void do_mpflag( CHAR_DATA* ch, const char* argument)
+void do_mpflag( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *victim;
    VARIABLE_DATA *vd;
@@ -429,7 +427,7 @@ void do_mpflag( CHAR_DATA* ch, const char* argument)
 /*
  * mprmflag <victim> <tag> <flag>
  */
-void do_mprmflag( CHAR_DATA* ch, const char* argument)
+void do_mprmflag( CHAR_DATA * ch, char *argument )
 {
    CHAR_DATA *victim;
    VARIABLE_DATA *vd;
@@ -572,7 +570,7 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
                {
                   default:
                   {
-                     bug( "%s: invalid/incomplete variable: %s", __func__, pvd->tag );
+                     bug( "%s: invalid/incomplete variable: %s", __FUNCTION__, pvd->tag );
                      DISPOSE( pvd->tag );
                      DISPOSE( pvd );
                      break;
@@ -581,7 +579,7 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
                   case vtXBIT:
                      if( !pvd->data )
                      {
-                        bug( "%s: invalid/incomplete variable: %s", __func__, pvd->tag );
+                        bug( "%s: invalid/incomplete variable: %s", __FUNCTION__, pvd->tag );
                         DISPOSE( pvd->tag );
                         DISPOSE( pvd );
                         break;
@@ -602,7 +600,7 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
             if( !str_cmp( word, "Int" ) )
             {
                if( pvd->type != vtINT )
-                  bug( "%s: Type mismatch -- type(%d) != vtInt", __func__, pvd->type );
+                  bug( "%s: Type mismatch -- type(%d) != vtInt", __FUNCTION__, pvd->type );
                else
                {
                   pvd->data = ( void * )( ( long )fread_number( fp ) );
@@ -624,7 +622,7 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
             if( !str_cmp( word, "Str" ) )
             {
                if( pvd->type != vtSTR )
-                  bug( "%s: Type mismatch -- type(%d) != vtSTR", __func__, pvd->type );
+                  bug( "%s: Type mismatch -- type(%d) != vtSTR", __FUNCTION__, pvd->type );
                else
                {
                   pvd->data = fread_string_nohash( fp );
@@ -648,7 +646,7 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
             if( !str_cmp( word, "Xbit" ) )
             {
                if( pvd->type != vtXBIT )
-                  bug( "%s: Type mismatch -- type(%d) != vtXBIT", __func__, pvd->type );
+                  bug( "%s: Type mismatch -- type(%d) != vtXBIT", __FUNCTION__, pvd->type );
                else
                {
                   CREATE( pvd->data, EXT_BV, 1 );
@@ -661,6 +659,6 @@ void fread_variable( CHAR_DATA * ch, FILE * fp )
       }
 
       if( !fMatch )
-         bug( "%s: no match: %s", __func__, word );
+         bug( "%s: no match: %s", __FUNCTION__, word );
    }
 }

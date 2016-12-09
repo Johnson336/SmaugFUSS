@@ -1,11 +1,11 @@
 /****************************************************************************
  * [S]imulated [M]edieval [A]dventure multi[U]ser [G]ame      |   \\._.//   *
  * -----------------------------------------------------------|   (0...0)   *
- * SMAUG 1.8 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
+ * SMAUG 1.4 (C) 1994, 1995, 1996, 1998  by Derek Snider      |    ).:.(    *
  * -----------------------------------------------------------|    {o o}    *
  * SMAUG code team: Thoric, Altrag, Blodkai, Narn, Haus,      |   / ' ' \   *
  * Scryn, Rennard, Swordbearer, Gorog, Grishnakh, Nivek,      |~'~.VxvxV.~'~*
- * Tricops, Fireblade, Edmond, Conran                         |             *
+ * Tricops and Fireblade                                      |             *
  * ------------------------------------------------------------------------ *
  * Merc 2.1 Diku Mud improvments copyright (C) 1992, 1993 by Michael        *
  * Chastain, Michael Quan, and Mitchell Tse.                                *
@@ -15,11 +15,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "mud.h"
+#include "phantasienIII.h"
 
 extern int top_affect;
 
-void do_mpmset( CHAR_DATA* ch, const char* argument)
+void do_mpmset( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];
@@ -555,7 +555,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
          return;
       }
 
-      if( arg3[0] == '\0' )
+      if( !arg3 || arg3[0] == '\0' )
       {
          STRFREE( victim->pcdata->deity_name );
          victim->pcdata->deity_name = STRALLOC( "" );
@@ -994,7 +994,7 @@ void do_mpmset( CHAR_DATA* ch, const char* argument)
    return;
 }
 
-void do_mposet( CHAR_DATA* ch, const char* argument)
+void do_mposet( CHAR_DATA * ch, char *argument )
 {
    char arg1[MAX_INPUT_LENGTH];
    char arg2[MAX_INPUT_LENGTH];

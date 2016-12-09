@@ -66,7 +66,7 @@ struct social_messg
 };
 
    /*
-    * UNCOMMENT if mud has Ascii Pfile code installed. 
+    * UNCOMMENT if phantasienIII.has Ascii Pfile code installed. 
     */
    /*
     * #include "diskio.h" 
